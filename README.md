@@ -2,6 +2,15 @@
 
 Teia Community smart contracts
 
+| Contract                | Comment                       | Audited? |
+| ------------------------|-------------------------------|----------|
+| teiaMarketplace_v1.py   | The official Teia marketplace | YES      |
+| multisigWallet_v1.py    | The officual Teia multisig    | YES      |
+| fa2.py                  |                               | NO       |
+| minter.py               |                               | NO       |
+| marketplace.py          |                               | NO       |
+| artistsCollaboration.py |                               | NO       |
+
 
 ## SmartPy installation
 
@@ -16,7 +25,7 @@ rm install.sh
 ```bash
 cd teia-smart-contracts
 ~/admin/smartpy/SmartPy.sh test python/tests/teiaMarketplace_v1_test.py output/tests/teiaMarketplace_v1 --html --purge
-~/admin/smartpy/SmartPy.sh test python/tests/multisigWallet_v1_test.py output/tests/multisigContract_v1 --html --purge
+~/admin/smartpy/SmartPy.sh test python/tests/multisigWallet_v1_test.py output/tests/multisigWallet_v1 --html --purge
 ~/admin/smartpy/SmartPy.sh test python/tests/fa2_test.py output/tests/fa2 --html --purge
 ~/admin/smartpy/SmartPy.sh test python/tests/minter_test.py output/tests/minter --html --purge
 ~/admin/smartpy/SmartPy.sh test python/tests/marketplace_test.py output/tests/marketplace --html --purge
