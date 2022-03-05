@@ -14,5 +14,5 @@ jobs:
         with:
           python-version: '3.x'
           architecture: 'x64'
-      - run: printf '%s\n' 'y' 'y' | sh <(wget https://smartpy.io/cli/install.sh)
+      - run: printf '%s\n' 'y' 'y' | bash <(curl -s https://smartpy.io/cli/install.sh)
       - run: ./test.sh
