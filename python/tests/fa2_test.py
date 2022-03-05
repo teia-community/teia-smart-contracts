@@ -5,7 +5,7 @@
 import smartpy as sp
 
 # Import the fa2 contract module
-fa2Module = sp.io.import_script_from_url("file:python/contracts/fa2.py")
+fa2Module = sp.io.import_script_from_url("file:contracts/fa2.py")
 
 
 class Dummy(sp.Contract):

@@ -5,8 +5,8 @@
 import smartpy as sp
 
 # Import the multisig wallet and fa2 contract modules
-multisigWalletModule = sp.io.import_script_from_url("file:python/contracts/multisigWallet_v1.py")
-fa2Module = sp.io.import_script_from_url("file:python/hen-contracts/fa2.py")
+multisigWalletModule = sp.io.import_script_from_url("file:contracts/multisigWallet_v1.py")
+fa2Module = sp.io.import_script_from_url("file:hen-contracts/fa2.py")
 
 
 class Recipient(sp.Contract):

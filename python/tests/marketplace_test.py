@@ -6,9 +6,9 @@ import os
 import smartpy as sp
 
 # Import the fa2, minter and marketplace contract modules
-fa2Module = sp.io.import_script_from_url("file:python/contracts/fa2.py")
-minterModule = sp.io.import_script_from_url("file:python/contracts/minter.py")
-marketplaceModule = sp.io.import_script_from_url("file:python/contracts/marketplace.py")
+fa2Module = sp.io.import_script_from_url("file:contracts/fa2.py")
+minterModule = sp.io.import_script_from_url("file:contracts/minter.py")
+marketplaceModule = sp.io.import_script_from_url("file:contracts/marketplace.py")
 
 
 class Recipient(sp.Contract):
