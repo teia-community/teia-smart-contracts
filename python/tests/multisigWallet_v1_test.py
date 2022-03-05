@@ -62,6 +62,9 @@ class Dummy(sp.Contract):
 
 
 def get_test_environment():
+    # Initialize the test scenario
+    scenario = sp.test_scenario()
+
     # Create the test accounts
     user1 = sp.test_account("user1")
     user2 = sp.test_account("user2")
@@ -75,12 +78,7 @@ def get_test_environment():
         users=sp.set([user1.address, user2.address, user3.address, user4.address]),
         minimum_votes=3,
         expiration_time=3)
-
-    # Add some initial balance to the multisig wallet
     multisig.set_initial_balance(sp.tez(10))
-
-    # Add the contract to the test scenario
-    scenario = sp.test_scenario()
     scenario += multisig
 
     # Save all the variables in a test environment dictionary

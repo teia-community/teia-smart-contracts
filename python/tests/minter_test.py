@@ -10,24 +10,26 @@ minterModule = sp.io.import_script_from_url("file:python/contracts/minter.py")
 
 
 def get_test_environment():
+    # Initialize the test scenario
+    scenario = sp.test_scenario()
+
     # Create the test accounts
     admin = sp.test_account("admin")
     user1 = sp.test_account("user1")
     user2 = sp.test_account("user2")
     user3 = sp.test_account("user3")
 
-    # Initialize extended FA2 and minter contracts
+    # Initialize the extended FA2 contract
     fa2 = fa2Module.FA2(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"))
+    scenario += fa2
+
+    # Initialize the minter contract
     minter = minterModule.Minter(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://bbb"),
         fa2=fa2.address)
-
-    # Add the contracts to the test scenario
-    scenario = sp.test_scenario()
-    scenario += fa2
     scenario += minter
 
     # Set the minter contract as the admin of the FA2 contract

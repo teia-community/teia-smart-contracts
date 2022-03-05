@@ -67,6 +67,9 @@ class Dummy(sp.Contract):
 
 
 def get_test_environment():
+    # Initialize the test scenario
+    scenario = sp.test_scenario()
+
     # Create the test accounts
     admin = sp.test_account("admin")
     user = sp.test_account("user")
@@ -75,22 +78,19 @@ def get_test_environment():
     artist1 = Recipient()
     artist2 = Recipient()
     artist3 = Recipient()
+    scenario += artist1
+    scenario += artist2
+    scenario += artist3
 
     # Initialize the artists collaboration originator contract
     originator = artistsCollaborationModule.ArtistsCollaborationOriginator(
         metadata=sp.utils.metadata_of_url("ipfs://aaa"))
+    scenario += originator
 
     # Initialize the lambda provider contract
     lambda_provider = artistsCollaborationModule.LambdaProvider(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://bbb"))
-
-    # Add the contracts to the test scenario
-    scenario = sp.test_scenario()
-    scenario += artist1
-    scenario += artist2
-    scenario += artist3
-    scenario += originator
     scenario += lambda_provider
 
     # Save all the variables in a test environment dictionary
@@ -512,23 +512,25 @@ def test_full_example():
     originator = testEnvironment["originator"]
     lambda_provider = testEnvironment["lambda_provider"]
 
-    # Initialize extended FA2, minter and marketplace contracts
+    # Initialize the extended FA2 contract
     fa2 = fa2Module.FA2(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"))
+    scenario += fa2
+
+    # Initialize the minter contract
     minter = minterModule.Minter(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://bbb"),
         fa2=fa2.address)
+    scenario += minter
+
+    # Initialize the marketplace contract
     marketplace = marketplaceModule.Marketplace(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://ccc"),
         fa2=fa2.address,
         fee=sp.nat(25))
-
-    # Add the contracts to the test scenario
-    scenario += fa2
-    scenario += minter
     scenario += marketplace
 
     # Set the minter contract as the admin of the FA2 contract

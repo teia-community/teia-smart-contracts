@@ -43,6 +43,9 @@ class Dummy(sp.Contract):
 
 
 def get_test_environment():
+    # Initialize the test scenario
+    scenario = sp.test_scenario()
+
     # Create the test accounts
     admin = sp.test_account("admin")
     user1 = sp.test_account("user1")
@@ -53,9 +56,6 @@ def get_test_environment():
     fa2 = fa2Module.FA2(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"))
-
-    # Add the contract to the test scenario
-    scenario = sp.test_scenario()
     scenario += fa2
 
     # Save all the variables in a test environment dictionary

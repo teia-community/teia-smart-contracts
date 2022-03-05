@@ -37,6 +37,9 @@ class Recipient(sp.Contract):
 
 
 def get_test_environment():
+    # Initialize the test scenario
+    scenario = sp.test_scenario()
+
     # Create the test accounts
     admin = sp.test_account("admin")
     artist1 = sp.test_account("artist1")
@@ -49,21 +52,25 @@ def get_test_environment():
         config=fa2Module.FA2_config(),
         admin=admin.address,
         meta=sp.utils.metadata_of_url("ipfs://aaa"))
+    scenario += objkt
 
     # Initialize the hDAO contract
     hdao = fa2Module.FA2(
         config=fa2Module.FA2_config(),
         admin=admin.address,
         meta=sp.utils.metadata_of_url("ipfs://bbb"))
+    scenario += hdao
 
     # Initialize the new OBJKT contract
     newobjkt = fa2Module.FA2(
         config=fa2Module.FA2_config(),
         admin=admin.address,
         meta=sp.utils.metadata_of_url("ipfs://ccc"))
+    scenario += newobjkt
 
     # Initialize a dummy curate contract
     curate = sp.Contract()
+    scenario += curate
 
     # Initialize the minter (v1) contract
     minter = minterModule.OBJKTSwap(
@@ -72,6 +79,7 @@ def get_test_environment():
         manager=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://ddd"),
         curate=curate.address)
+    scenario += minter
 
     # Initialize the marketplace contract
     marketplace = marketplaceModule.Marketplace(
@@ -79,19 +87,11 @@ def get_test_environment():
         metadata=sp.utils.metadata_of_url("ipfs://eee"),
         allowed_fa2s=sp.big_map({objkt.address: sp.unit}),
         fee=25)
+    scenario += marketplace
 
     # Initialize the recipient contracts
     fee_recipient = Recipient()
     royalties_recipient = Recipient()
-
-    # Add all the contracts to the test scenario
-    scenario = sp.test_scenario()
-    scenario += objkt
-    scenario += hdao
-    scenario += newobjkt
-    scenario += curate
-    scenario += minter
-    scenario += marketplace
     scenario += fee_recipient
     scenario += royalties_recipient
 
