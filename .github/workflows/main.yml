@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Compile and run unit tests
 on:
   push:
     paths:
@@ -15,4 +15,5 @@ jobs:
           python-version: '3.x'
           architecture: 'x64'
       - run: printf '%s\n' 'y' 'y' | bash <(curl -s https://smartpy.io/cli/install.sh)
+      - run: ./compile.sh
       - run: ./test.sh
