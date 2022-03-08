@@ -3,7 +3,7 @@ import smartpy as sp
 
 class FA2(sp.Contract):
     """This contract tries to simplify and exented the FA2 contract template
-    example in smartpy.io v0.9.0.
+    example in smartpy.io v0.9.1.
 
     The FA2 template was originally developed by Seb Mondet:
     https://gitlab.com/smondet/fa2-smartpy
@@ -43,7 +43,7 @@ class FA2(sp.Contract):
     OPERATOR_KEY_TYPE = sp.TRecord(
         # The owner of the token editions
         owner=sp.TAddress,
-        # The operator allowed by the owner to transfer the token editions
+        # The operator allowed by the owner to transfer their token editions
         operator=sp.TAddress,
         # The token id
         token_id=sp.TNat).layout(
@@ -62,7 +62,7 @@ class FA2(sp.Contract):
             # The ledger bigmap where the tokens owners are listed
             ledger=sp.TBigMap(FA2.LEDGER_KEY_TYPE, sp.TNat),
             # The tokens total supply
-            total_supply=sp.TBigMap(sp.TNat, sp.TNat),
+            supply=sp.TBigMap(sp.TNat, sp.TNat),
             # The big map with the tokens metadata
             token_metadata=sp.TBigMap(sp.TNat, FA2.TOKEN_METADATA_VALUE_TYPE),
             # The big map with the tokens data (source code, description, etc)
@@ -81,7 +81,7 @@ class FA2(sp.Contract):
             administrator=administrator,
             metadata=metadata,
             ledger=sp.big_map(),
-            total_supply=sp.big_map(),
+            supply=sp.big_map(),
             token_metadata=sp.big_map(),
             token_data=sp.big_map(),
             token_royalties=sp.big_map(),
@@ -89,22 +89,18 @@ class FA2(sp.Contract):
             proposed_administrator=sp.none,
             counter=0)
 
-        # Adds some flags and optimization levels
-        self.add_flag("initial-cast")
-        self.exception_optimization_level = "default-line"
-
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
         contract_metadata = {
             "name": "Extended FA2 template contract",
             "description" : "This contract tries to simplify and extend the "
-                "FA2 contract template example in smartpy.io v0.9.0",
+                "FA2 contract template example in smartpy.io v0.9.1",
             "version": "v1.0.0",
-            "authors": ["Javier Gracia Carpio <https://twitter.com/jagracar>"],
-            "homepage": "https://github.com/jagracar/tezos-smart-contracts",
+            "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+            "homepage": "https://teia.art",
             "source": {
-                "tools": ["SmartPy 0.9.0"],
-                "location": "https://github.com/jagracar/tezos-smart-contracts/blob/main/python/contracts/extendedFa2Contract.py"
+                "tools": ["SmartPy 0.9.1"],
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/fa2.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
             "views": [
@@ -133,35 +129,11 @@ class FA2(sp.Contract):
         """
         sp.verify(sp.sender == self.data.administrator, message="FA2_NOT_ADMIN")
 
-    def check_is_owner(self, owner):
-        """Checks that the address that called the entry point is the owner of
-        the token editions.
-
-        """
-        sp.verify(sp.sender == owner, message="FA2_SENDER_IS_NOT_OWNER")
-
-    def check_is_operator(self, owner, token_id):
-        """Checks that the address that called the entry point is allowed to
-        transfer the token.
-
-        """
-        sp.verify((sp.sender == owner) | 
-                  (self.data.operators.contains(sp.record(
-                      owner=owner, operator=sp.sender, token_id=token_id))),
-                  message="FA2_NOT_OPERATOR")
-
     def check_token_exists(self, token_id):
         """Checks that the given token exists.
 
         """
         sp.verify(token_id < self.data.counter, message="FA2_TOKEN_UNDEFINED")
-
-    def check_sufficient_balance(self, owner, token_id, amount):
-        """Checks that the owner has enough editions of the given token.
-
-        """
-        sp.verify(self.data.ledger[(owner, token_id)] >= amount,
-                  message="FA2_INSUFFICIENT_BALANCE")
 
     @sp.entry_point
     def mint(self, params):
@@ -188,10 +160,10 @@ class FA2(sp.Contract):
                   message="FA2_INVALID_ROYALTIES")
 
         # Update the big maps
-        token_id = self.data.counter
+        token_id = sp.compute(self.data.counter)
         self.data.ledger[
             (params.royalties.minter.address, token_id)] = params.editions
-        self.data.total_supply[token_id] = params.editions
+        self.data.supply[token_id] = params.editions
         self.data.token_metadata[token_id] = sp.record(
             token_id=token_id,
             token_info=params.metadata)
@@ -219,30 +191,30 @@ class FA2(sp.Contract):
         # Loop over the list of transfers
         with sp.for_("transfer", params) as transfer:
             with sp.for_("tx", transfer.txs) as tx:
-                # Check that the sender is one of the token operators
-                self.check_is_operator(transfer.from_, tx.token_id)
-
                 # Check that the token exists
-                self.check_token_exists(tx.token_id)
+                token_id = sp.compute(tx.token_id)
+                self.check_token_exists(token_id)
 
-                # Only do something if the token amount is larger than zero
-                with sp.if_(tx.amount > 0):
-                    # Check that the owner has enough editions of the token
-                    self.check_sufficient_balance(
-                        transfer.from_, tx.token_id, tx.amount)
+                # Check that the sender is one of the token operators
+                owner = sp.compute(transfer.from_)
+                sp.verify(
+                    (sp.sender == owner) | 
+                    self.data.operators.contains(sp.record(
+                        owner=owner,
+                        operator=sp.sender,
+                        token_id=token_id)),
+                    message="FA2_NOT_OPERATOR")
 
-                    # Remove the token amount from the owner
-                    owner_key = sp.pair(transfer.from_, tx.token_id)
-                    self.data.ledger[owner_key] = sp.as_nat(
-                        self.data.ledger[owner_key] - tx.amount)
+                # Remove the token amount from the owner
+                owner_key = sp.pair(owner, token_id)
+                self.data.ledger[owner_key] = sp.as_nat(
+                    self.data.ledger.get(owner_key, 0) - tx.amount,
+                    "FA2_INSUFFICIENT_BALANCE")
 
-                    # Add the token amount to the new owner
-                    new_owner_key = sp.pair(tx.to_, tx.token_id)
-
-                    with sp.if_(self.data.ledger.contains(new_owner_key)):
-                        self.data.ledger[new_owner_key] += tx.amount
-                    with sp.else_():
-                         self.data.ledger[new_owner_key] = tx.amount
+                # Add the token amount to the new owner
+                new_owner_key = sp.pair(tx.to_, token_id)
+                self.data.ledger[new_owner_key] = self.data.ledger.get(
+                    new_owner_key, 0) + tx.amount
 
     @sp.entry_point
     def balance_of(self, params):
@@ -264,24 +236,14 @@ class FA2(sp.Contract):
             # Check that the token exists
             self.check_token_exists(request.token_id)
 
-            # Check if the owner has the token or had it in the past
-            ledger_key = sp.pair(request.owner, request.token_id)
+            # Return the owner token balance
+            sp.result(sp.record(
+                request=request,
+                balance=self.data.ledger.get(
+                    (request.owner, request.token_id), 0)))
 
-            with sp.if_(self.data.ledger.contains(ledger_key)):
-                sp.result(sp.record(
-                    request=sp.record(
-                        owner=request.owner,
-                        token_id=request.token_id),
-                    balance=self.data.ledger[ledger_key]))
-            with sp.else_():
-                sp.result(sp.record(
-                    request=sp.record(
-                        owner=request.owner,
-                        token_id=request.token_id),
-                    balance=0))
-
-        responses = sp.local("responses", params.requests.map(process_request))
-        sp.transfer(responses.value, sp.mutez(0), params.callback)
+        sp.transfer(
+            params.requests.map(process_request), sp.mutez(0), params.callback)
 
     @sp.entry_point
     def update_operators(self, params):
@@ -298,13 +260,15 @@ class FA2(sp.Contract):
             with update_operator.match_cases() as arg:
                 with arg.match("add_operator") as operator_key:
                     # Check that the sender is the token owner
-                    self.check_is_owner(operator_key.owner)
+                    sp.verify(sp.sender == operator_key.owner,
+                              message="FA2_SENDER_IS_NOT_OWNER")
 
                     # Add the new operator to the operators big map
                     self.data.operators[operator_key] = sp.unit
                 with arg.match("remove_operator") as operator_key:
                     # Check that the sender is the token owner
-                    self.check_is_owner(operator_key.owner)
+                    sp.verify(sp.sender == operator_key.owner,
+                              message="FA2_SENDER_IS_NOT_OWNER")
 
                     # Remove the operator from the operators big map
                     del self.data.operators[operator_key]
@@ -373,7 +337,7 @@ class FA2(sp.Contract):
         self.check_token_exists(params.token_id)
 
         # Return the owner token balance
-        sp.result(self.data.ledger[(params.owner, params.token_id)])
+        sp.result(self.data.ledger.get((params.owner, params.token_id), 0))
 
     @sp.onchain_view(pure=True)
     def does_token_exist(self, token_id):
@@ -408,8 +372,11 @@ class FA2(sp.Contract):
         # Define the input parameter data type
         sp.set_type(token_id, sp.TNat)
 
+        # Check that the token exists
+        self.check_token_exists(token_id)
+
         # Return the token total supply
-        sp.result(self.data.total_supply[token_id])
+        sp.result(self.data.supply.get(token_id, 0))
 
     @sp.onchain_view(pure=True)
     def is_operator(self, params):
