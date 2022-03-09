@@ -28,6 +28,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/minter.py ../output/contracts/minter --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/marketplace.py ../output/contracts/marketplace --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/artistsCollaboration.py ../output/contracts/artistsCollaboration --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/daoToken.py ../output/contracts/daoToken --html --purge
 ```
 
 ## Execute the tests
