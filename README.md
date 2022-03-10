@@ -8,6 +8,7 @@
 | [Extended FA2 token minter](python/ccontracts/minter.py) | | Prototype |
 | [Marketplace for the extended FA2 token](python/ccontracts/marketplace.py) | | Prototype |
 | [Artists collaboration](python/ccontracts/artistsCollaboration.py) | | Prototype |
+| [DAO token](python/ccontracts/daoToken.py) | | Prototype |
 
 
 ## SmartPy installation
