@@ -8,6 +8,7 @@
 | [Extended FA2 token minter](python/ccontracts/minter.py) | | Prototype |
 | [Marketplace for the extended FA2 token](python/ccontracts/marketplace.py) | | Prototype |
 | [Artists collaboration](python/ccontracts/artistsCollaboration.py) | | Prototype |
+| [DAO token](python/ccontracts/daoToken.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -28,6 +29,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/minter.py ../output/contracts/minter --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/marketplace.py ../output/contracts/marketplace --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/artistsCollaboration.py ../output/contracts/artistsCollaboration --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/daoToken.py ../output/contracts/daoToken --html --purge
 ```
 
 ## Execute the tests
@@ -40,4 +42,5 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/minter_test.py ../output/tests/minter --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/marketplace_test.py ../output/tests/marketplace --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/artistsCollaboration_test.py ../output/tests/artistsCollaboration --html --purge
+~/smartpy-cli/SmartPy.sh test tests/daoToken_test.py ../output/tests/daoToken --html --purge
 ```

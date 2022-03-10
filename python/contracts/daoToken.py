@@ -1,9 +1,9 @@
 import smartpy as sp
 
 
-class FA2(sp.Contract):
-    """This contract tries to simplify and exented the FA2 contract template
-    example in smartpy.io v0.9.1.
+class DAOToken(sp.Contract):
+    """This contract adapts the FA2 contract template example in smartpy.io
+    v0.9.1 to be used as a DAO token.
 
     The FA2 template was originally developed by Seb Mondet:
     https://gitlab.com/smondet/fa2-smartpy
@@ -13,32 +13,12 @@ class FA2(sp.Contract):
 
     """
 
-    LEDGER_KEY_TYPE = sp.TPair(
-        # The owner of the token editions
-        sp.TAddress,
-        # The token id
-        sp.TNat)
-
     TOKEN_METADATA_VALUE_TYPE = sp.TRecord(
         # The token id
         token_id=sp.TNat,
         # The map with the token metadata information
         token_info=sp.TMap(sp.TString, sp.TBytes)).layout(
             ("token_id", "token_info"))
-
-    USER_ROYALTIES_TYPE = sp.TRecord(
-        # The user address
-        address=sp.TAddress,
-        # The user royalties in per mille (100 is 10%)
-        royalties=sp.TNat).layout(
-            ("address", "royalties"))
-
-    TOKEN_ROYALTIES_VALUE_TYPE = sp.TRecord(
-        # The token original minter
-        minter=USER_ROYALTIES_TYPE,
-        # The token creator (it could be a single creator or a collaboration)
-        creator=USER_ROYALTIES_TYPE).layout(
-            ("minter", "creator"))
 
     OPERATOR_KEY_TYPE = sp.TRecord(
         # The owner of the token editions
@@ -49,7 +29,7 @@ class FA2(sp.Contract):
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
 
-    def __init__(self, administrator, metadata):
+    def __init__(self, administrator, metadata, token_metadata):
         """Initializes the contract.
 
         """
@@ -59,48 +39,46 @@ class FA2(sp.Contract):
             administrator=sp.TAddress,
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
-            # The ledger big map where the tokens owners are listed
-            ledger=sp.TBigMap(FA2.LEDGER_KEY_TYPE, sp.TNat),
-            # The tokens total supply
-            supply=sp.TBigMap(sp.TNat, sp.TNat),
-            # The big map with the tokens metadata
-            token_metadata=sp.TBigMap(sp.TNat, FA2.TOKEN_METADATA_VALUE_TYPE),
-            # The big map with the tokens data (source code, description, etc)
-            token_data=sp.TBigMap(sp.TNat, sp.TMap(sp.TString, sp.TBytes)),
-            # The big map with the tokens royalties for the minter and creators
-            token_royalties=sp.TBigMap(sp.TNat, FA2.TOKEN_ROYALTIES_VALUE_TYPE),
-            # The big map with the tokens operators
-            operators=sp.TBigMap(FA2.OPERATOR_KEY_TYPE, sp.TUnit),
+            # The ledger big map where the token owners are listed
+            ledger=sp.TBigMap(sp.TAddress, sp.TNat),
+            # The token total supply
+            supply=sp.TNat,
+            # The big map with the token metadata
+            token_metadata=sp.TBigMap(sp.TNat, DAOToken.TOKEN_METADATA_VALUE_TYPE),
+            # The big map with the token operators
+            operators=sp.TBigMap(DAOToken.OPERATOR_KEY_TYPE, sp.TUnit),
             # The proposed new administrator address
-            proposed_administrator=sp.TOption(sp.TAddress),
-            # A counter that tracks the total number of tokens minted so far
-            counter=sp.TNat))
+            proposed_administrator=sp.TOption(sp.TAddress)))
 
         # Initialize the contract storage
         self.init(
             administrator=administrator,
             metadata=metadata,
             ledger=sp.big_map(),
-            supply=sp.big_map(),
-            token_metadata=sp.big_map(),
-            token_data=sp.big_map(),
-            token_royalties=sp.big_map(),
+            supply=0,
+            token_metadata=sp.big_map({
+                0: sp.record(
+                    token_id=0,
+                    token_info={
+                        "": token_metadata,
+                        "name": sp.utils.bytes_of_string("Teia Community DAO"),
+                        "symbol": sp.utils.bytes_of_string("teiaDAO"),
+                        "decimals": sp.utils.bytes_of_string("6")
+                    })}),
             operators=sp.big_map(),
-            proposed_administrator=sp.none,
-            counter=0)
+            proposed_administrator=sp.none)
 
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
         contract_metadata = {
-            "name": "Extended FA2 template contract",
-            "description" : "This contract tries to simplify and extend the "
-                "FA2 contract template example in smartpy.io v0.9.1",
+            "name": "Teia Community DAO token contract",
+            "description" : "A basic DAO token contract for the Teia Community",
             "version": "v1.0.0",
             "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
             "homepage": "https://teia.art",
             "source": {
                 "tools": ["SmartPy 0.9.1"],
-                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/fa2.py"
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
             "views": [
@@ -108,9 +86,7 @@ class FA2(sp.Contract):
                 self.total_supply,
                 self.all_tokens,
                 self.is_operator,
-                self.token_metadata,
-                self.token_data,
-                self.token_royalties],
+                self.token_metadata],
             "permissions": {
                 "operator": "owner-or-operator-transfer",
                 "receiver": "owner-no-hook",
@@ -131,42 +107,32 @@ class FA2(sp.Contract):
         """Checks that the given token exists.
 
         """
-        sp.verify(token_id < self.data.counter, message="FA2_TOKEN_UNDEFINED")
+        sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
     @sp.entry_point
     def mint(self, params):
-        """Mints a new token.
+        """Mints new token editions.
 
         """
         # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            amount=sp.TNat,
-            metadata=sp.TMap(sp.TString, sp.TBytes),
-            data=sp.TMap(sp.TString, sp.TBytes),
-            royalties=FA2.TOKEN_ROYALTIES_VALUE_TYPE).layout(
-                ("amount", ("metadata", ("data", "royalties")))))
+        sp.set_type(params, sp.TList(sp.TRecord(
+            to_=sp.TAddress,
+            token_id=sp.TNat,
+            amount=sp.TNat).layout(
+                ("to_", ("token_id", "amount")))))
 
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Check that the total royalties do not exceed 100%
-        sp.verify(params.royalties.minter.royalties + 
-                  params.royalties.creator.royalties <= 1000,
-                  message="FA2_INVALID_ROYALTIES")
+        # Loop over the list of mints
+        with sp.for_("mint", params) as mint:
+            # Check that the token exists
+            self.check_token_exists(mint.token_id)
 
-        # Update the big maps
-        token_id = sp.compute(self.data.counter)
-        self.data.ledger[
-            (params.royalties.minter.address, token_id)] = params.amount
-        self.data.supply[token_id] = params.amount
-        self.data.token_metadata[token_id] = sp.record(
-            token_id=token_id,
-            token_info=params.metadata)
-        self.data.token_data[token_id] = params.data
-        self.data.token_royalties[token_id] = params.royalties
-
-        # Increase the tokens counter
-        self.data.counter += 1
+            # Update the ledger big map and the total supply
+            self.data.ledger[mint.to_] = self.data.ledger.get(
+                mint.to_, 0) + mint.amount
+            self.data.supply += mint.amount
 
     @sp.entry_point
     def transfer(self, params):
@@ -187,8 +153,7 @@ class FA2(sp.Contract):
         with sp.for_("transfer", params) as transfer:
             with sp.for_("tx", transfer.txs) as tx:
                 # Check that the token exists
-                token_id = sp.compute(tx.token_id)
-                self.check_token_exists(token_id)
+                self.check_token_exists(tx.token_id)
 
                 # Check that the sender is one of the token operators
                 owner = sp.compute(transfer.from_)
@@ -197,21 +162,19 @@ class FA2(sp.Contract):
                     self.data.operators.contains(sp.record(
                         owner=owner,
                         operator=sp.sender,
-                        token_id=token_id)),
+                        token_id=0)),
                     message="FA2_NOT_OPERATOR")
 
                 # Check that the transfer amount is not zero
                 with sp.if_(tx.amount > 0):
                     # Remove the token amount from the owner
-                    owner_key = sp.pair(owner, token_id)
-                    self.data.ledger[owner_key] = sp.as_nat(
-                        self.data.ledger.get(owner_key, 0) - tx.amount,
+                    self.data.ledger[owner] = sp.as_nat(
+                        self.data.ledger.get(owner, 0) - tx.amount,
                         "FA2_INSUFFICIENT_BALANCE")
 
                     # Add the token amount to the new owner
-                    new_owner_key = sp.pair(tx.to_, token_id)
-                    self.data.ledger[new_owner_key] = self.data.ledger.get(
-                        new_owner_key, 0) + tx.amount
+                    self.data.ledger[tx.to_] = self.data.ledger.get(
+                        tx.to_, 0) + tx.amount
 
     @sp.entry_point
     def balance_of(self, params):
@@ -236,8 +199,7 @@ class FA2(sp.Contract):
             # Return the owner token balance
             sp.result(sp.record(
                 request=request,
-                balance=self.data.ledger.get(
-                    (request.owner, request.token_id), 0)))
+                balance=self.data.ledger.get(request.owner, 0)))
 
         sp.transfer(
             params.requests.map(process_request), sp.mutez(0), params.callback)
@@ -249,8 +211,8 @@ class FA2(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TList(sp.TVariant(
-            add_operator=FA2.OPERATOR_KEY_TYPE,
-            remove_operator=FA2.OPERATOR_KEY_TYPE)))
+            add_operator=DAOToken.OPERATOR_KEY_TYPE,
+            remove_operator=DAOToken.OPERATOR_KEY_TYPE)))
 
         # Loop over the list of update operators
         with sp.for_("update_operator", params) as update_operator:
@@ -335,14 +297,14 @@ class FA2(sp.Contract):
         sp.set_type(token_id, sp.TNat)
 
         # Return true if the token exists
-        sp.result(token_id < self.data.counter)
+        sp.result(token_id == 0)
 
     @sp.onchain_view(pure=True)
     def count_tokens(self):
         """Returns how many tokens are in this FA2 contract.
 
         """
-        sp.result(self.data.counter)
+        sp.result(sp.nat(1))
 
     @sp.onchain_view(pure=True)
     def get_balance(self, params):
@@ -358,7 +320,7 @@ class FA2(sp.Contract):
         self.check_token_exists(params.token_id)
 
         # Return the owner token balance
-        sp.result(self.data.ledger.get((params.owner, params.token_id), 0))
+        sp.result(self.data.ledger.get(params.owner, 0))
 
     @sp.onchain_view(pure=True)
     def total_supply(self, token_id):
@@ -372,14 +334,14 @@ class FA2(sp.Contract):
         self.check_token_exists(token_id)
 
         # Return the token total supply
-        sp.result(self.data.supply.get(token_id, 0))
+        sp.result(self.data.supply)
 
     @sp.onchain_view(pure=True)
     def all_tokens(self):
         """Returns a list with all the token ids.
 
         """
-        sp.result(sp.range(0, self.data.counter))
+        sp.result(sp.list([0], t=sp.TNat))
 
     @sp.onchain_view(pure=True)
     def is_operator(self, params):
@@ -387,7 +349,7 @@ class FA2(sp.Contract):
 
         """
         # Define the input parameter data type
-        sp.set_type(params, FA2.OPERATOR_KEY_TYPE)
+        sp.set_type(params, DAOToken.OPERATOR_KEY_TYPE)
 
         # Check that the token exists
         self.check_token_exists(params.token_id)
@@ -409,29 +371,8 @@ class FA2(sp.Contract):
         # Return the token metadata
         sp.result(self.data.token_metadata[token_id])
 
-    @sp.onchain_view(pure=True)
-    def token_data(self, token_id):
-        """Returns the token on-chain data.
 
-        """
-        # Define the input parameter data type
-        sp.set_type(token_id, sp.TNat)
-
-        # Return the token on-chain data
-        sp.result(self.data.token_data[token_id])
-
-    @sp.onchain_view(pure=True)
-    def token_royalties(self, token_id):
-        """Returns the token royalties information.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(token_id, sp.TNat)
-
-        # Return the token royalties information
-        sp.result(self.data.token_royalties[token_id])
-
-
-sp.add_compilation_target("fa2", FA2(
+sp.add_compilation_target("daoToken", DAOToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
-    metadata=sp.utils.metadata_of_url("ipfs://aaa")))
+    metadata=sp.utils.metadata_of_url("ipfs://aaa"),
+    token_metadata=sp.utils.bytes_of_string("ipfs://bbb")))

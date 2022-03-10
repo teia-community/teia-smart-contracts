@@ -129,7 +129,7 @@ def test_swap_and_collect():
     royalties = 100
     minter.mint(
         editions=minted_editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist2.address)
 
@@ -267,7 +267,7 @@ def test_free_collect():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
@@ -325,7 +325,7 @@ def test_very_cheap_collect():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
@@ -481,7 +481,7 @@ def test_set_pause_swaps():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
@@ -557,7 +557,7 @@ def test_set_pause_collects():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
@@ -635,7 +635,7 @@ def test_swap_failure_conditions():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
@@ -703,7 +703,7 @@ def test_swap_failure_conditions():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist2.address)
 
@@ -761,7 +761,7 @@ def test_cancel_swap_failure_conditions():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
@@ -822,7 +822,7 @@ def test_collect_swap_failure_conditions():
     royalties = 100
     minter.mint(
         editions=editions,
-        metadata={"": sp.pack("ipfs://fff")},
+        metadata={"": sp.utils.bytes_of_string("ipfs://fff")},
         data={},
         royalties=royalties).run(sender=artist1.address)
 
