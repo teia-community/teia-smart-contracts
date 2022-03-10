@@ -41,4 +41,5 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/minter_test.py ../output/tests/minter --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/marketplace_test.py ../output/tests/marketplace --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/artistsCollaboration_test.py ../output/tests/artistsCollaboration --html --purge
+~/smartpy-cli/SmartPy.sh test tests/daoToken_test.py ../output/tests/daoToken --html --purge
 ```

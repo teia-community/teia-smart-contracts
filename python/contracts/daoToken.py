@@ -289,6 +289,24 @@ class DAOToken(sp.Contract):
         self.data.metadata[params.k] = params.v
 
     @sp.onchain_view(pure=True)
+    def token_exists(self, token_id):
+        """Checks if the token exists.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_id, sp.TNat)
+
+        # Return true if the token exists
+        sp.result(token_id == 0)
+
+    @sp.onchain_view(pure=True)
+    def count_tokens(self):
+        """Returns how many tokens are in this FA2 contract.
+
+        """
+        sp.result(sp.nat(1))
+
+    @sp.onchain_view(pure=True)
     def get_balance(self, params):
         """Returns the owner token balance.
 
