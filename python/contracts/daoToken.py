@@ -62,7 +62,7 @@ class DAOToken(sp.Contract):
                     token_info={
                         "": token_metadata,
                         "name": sp.utils.bytes_of_string("Teia Community DAO"),
-                        "symbol": sp.utils.bytes_of_string("teiaDAO"),
+                        "symbol": sp.utils.bytes_of_string("TEIA"),
                         "decimals": sp.utils.bytes_of_string("6")
                     })}),
             operators=sp.big_map(),
