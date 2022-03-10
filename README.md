@@ -3,12 +3,12 @@
 | Contract | TzKT link | Status |
 |----------|-----------|--------|
 | [Teia Marketplace (v1)](python/contracts/teiaMarketplace_v1.py) | [KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w](https://tzkt.io/KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w) | Audited |
-| [Multisig Wallet / mini-DAO (v1)](python/ccontracts/multisigWallet_v1.py) | [KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P](https://tzkt.io/KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P) | Audited |
-| [Extended FA2 token](python/ccontracts/fa2.py) | | Prototype |
-| [Extended FA2 token minter](python/ccontracts/minter.py) | | Prototype |
-| [Marketplace for the extended FA2 token](python/ccontracts/marketplace.py) | | Prototype |
-| [Artists collaboration](python/ccontracts/artistsCollaboration.py) | | Prototype |
-| [DAO token](python/ccontracts/daoToken.py) | | Prototype |
+| [Multisig Wallet / mini-DAO (v1)](python/contracts/multisigWallet_v1.py) | [KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P](https://tzkt.io/KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P) | Audited |
+| [Extended FA2 token](python/contracts/fa2.py) | | Prototype |
+| [Extended FA2 token minter](python/contracts/minter.py) | | Prototype |
+| [Marketplace for the extended FA2 token](python/contracts/marketplace.py) | | Prototype |
+| [Artists collaboration](python/contracts/artistsCollaboration.py) | | Prototype |
+| [DAO token](python/contracts/daoToken.py) | | Prototype |
 
 
 ## SmartPy installation
