@@ -29,6 +29,19 @@ class DAOToken(sp.Contract):
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
 
+    CHECKPOINT_KEY_TYPE = sp.TPair(
+        # The owner of the token editions
+        sp.TAddress,
+        # The owner checkpoint number
+        sp.TNat)
+
+    CHECKPOINT_VALUE_TYPE = sp.TRecord(
+        # The block level where the checkpoint was taken
+        level=sp.TNat,
+        # The owner token balance
+        balance=sp.TNat).layout(
+            ("level", "balance"))
+
     def __init__(self, administrator, metadata, token_metadata):
         """Initializes the contract.
 
@@ -44,9 +57,15 @@ class DAOToken(sp.Contract):
             # The token total supply
             supply=sp.TNat,
             # The big map with the token metadata
-            token_metadata=sp.TBigMap(sp.TNat, DAOToken.TOKEN_METADATA_VALUE_TYPE),
+            token_metadata=sp.TBigMap(
+                sp.TNat, DAOToken.TOKEN_METADATA_VALUE_TYPE),
             # The big map with the token operators
             operators=sp.TBigMap(DAOToken.OPERATOR_KEY_TYPE, sp.TUnit),
+            # The big map with the token balance checkpoints
+            checkpoints=sp.TBigMap(
+                DAOToken.CHECKPOINT_KEY_TYPE, DAOToken.CHECKPOINT_VALUE_TYPE),
+            # The big map with the number of checkpoints per token owner
+            n_checkpoints=sp.TBigMap(sp.TAddress, sp.TNat),
             # The proposed new administrator address
             proposed_administrator=sp.TOption(sp.TAddress)))
 
@@ -66,6 +85,8 @@ class DAOToken(sp.Contract):
                         "decimals": sp.utils.bytes_of_string("6")
                     })}),
             operators=sp.big_map(),
+            checkpoints=sp.big_map(),
+            n_checkpoints=sp.big_map(),
             proposed_administrator=sp.none)
 
         # Build the TZIP-016 contract metadata
@@ -109,6 +130,40 @@ class DAOToken(sp.Contract):
         """
         sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
+    @sp.private_lambda(with_storage="read-write", wrap_call=True)
+    def add_checkpoint(self, owner):
+        """Adds a new checkpoint to the checkpoints big map.
+
+        """
+        # Get the owner current balance
+        balance = sp.compute(self.data.ledger[owner])
+
+        # Check if the owner has already some checkpoints
+        with sp.if_(self.data.n_checkpoints.contains(owner)):
+            # Get the last checkpoint index
+            index = sp.compute(sp.as_nat(self.data.n_checkpoints[owner] - 1))
+
+            # Check if the last checkpoint is at the same block level
+            with sp.if_(self.data.checkpoints[(owner, index)].level == sp.level):
+                # Update the checkpoint balance
+                self.data.checkpoints[(owner, index)].balance = balance
+            with sp.else_():
+                # Check that the balance has changed
+                with sp.if_(self.data.checkpoints[(owner, index)].balance != balance):
+                    # Add a new checkpoint
+                    self.data.checkpoints[(owner, index + 1)] = sp.record(
+                        level=sp.level, balance=balance)
+
+                    # Increase the owner checkpoints counter
+                    self.data.n_checkpoints[owner] = index + 2
+        with sp.else_():
+            # Add the owner first checkpoint
+            self.data.checkpoints[(owner, 0)] = sp.record(
+                level=sp.level, balance=balance)
+
+            # Increase the owner checkpoints counter
+            self.data.n_checkpoints[owner] = 1
+
     @sp.entry_point
     def mint(self, params):
         """Mints new token editions.
@@ -133,6 +188,9 @@ class DAOToken(sp.Contract):
             self.data.ledger[mint.to_] = self.data.ledger.get(
                 mint.to_, 0) + mint.amount
             self.data.supply += mint.amount
+
+            # Add a balance checkpoint
+            self.add_checkpoint(mint.to_)
 
     @sp.entry_point
     def transfer(self, params):
@@ -175,6 +233,10 @@ class DAOToken(sp.Contract):
                     # Add the token amount to the new owner
                     self.data.ledger[tx.to_] = self.data.ledger.get(
                         tx.to_, 0) + tx.amount
+
+                    # Add the new balance checkpoints
+                    self.add_checkpoint(owner)
+                    self.add_checkpoint(tx.to_)
 
     @sp.entry_point
     def balance_of(self, params):
