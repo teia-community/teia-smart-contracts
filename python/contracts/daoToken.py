@@ -385,6 +385,49 @@ class DAOToken(sp.Contract):
         sp.result(self.data.ledger.get(params.owner, 0))
 
     @sp.onchain_view(pure=True)
+    def get_prior_balance(self, params):
+        """Returns the owner token balance at a given block level.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(params, sp.TRecord(
+            owner=sp.TAddress,
+            level=sp.TNat).layout(("owner", "level")))
+
+        # Check that the requested level is smaller than the current level
+        sp.verify(params.level < sp.level, message="FA2_WRONG_LEVEL")
+
+        # Check if the owner has any checkpoints
+        with sp.if_(~self.data.n_checkpoints.contains(params.owner)):
+            # No checkpoints implies zero balance
+            sp.result(sp.nat(0))
+        with sp.else_():
+            # Check if the requested level is older than the first checkpoint
+            with sp.if_(params.level < self.data.checkpoints[(params.owner, 0)].level):
+                # The balance was zero at the requested level
+                sp.result(sp.nat(0))
+            with sp.else_():
+                # Perform a binary search to find the correct checkpoint
+                lower = sp.local("lower", 0)
+                upper = sp.local("upper", sp.as_nat(self.data.n_checkpoints[params.owner] - 1))
+                center = sp.local("center", 0)
+
+                with sp.while_(lower.value < upper.value):
+                    # Get the central index
+                    center.value = sp.as_nat(upper.value - (sp.as_nat(upper.value - lower.value) / 2))
+
+                    # Check in which half we should continue the search
+                    with sp.if_(params.level < self.data.checkpoints[(params.owner, center.value)].level):
+                        # Search the lower half
+                        upper.value = sp.as_nat(center.value - 1)
+                    with sp.else_():
+                        # Search the upper half
+                        lower.value = center.value
+
+                # Return the balance at the lower index checkpoint
+                sp.result(self.data.checkpoints[(params.owner, lower.value)].balance)
+
+    @sp.onchain_view(pure=True)
     def total_supply(self, token_id):
         """Returns the total supply for a given token id.
 
