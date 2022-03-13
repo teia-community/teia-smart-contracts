@@ -76,14 +76,7 @@ class DAOToken(sp.Contract):
             ledger=sp.big_map(),
             supply=0,
             token_metadata=sp.big_map({
-                0: sp.record(
-                    token_id=0,
-                    token_info={
-                        "": token_metadata,
-                        "name": sp.utils.bytes_of_string("Teia Community DAO"),
-                        "symbol": sp.utils.bytes_of_string("TEIA"),
-                        "decimals": sp.utils.bytes_of_string("6")
-                    })}),
+                0: sp.record(token_id=0, token_info={"": token_metadata})}),
             operators=sp.big_map(),
             checkpoints=sp.big_map(),
             n_checkpoints=sp.big_map(),
@@ -124,6 +117,7 @@ class DAOToken(sp.Contract):
         """
         sp.verify(sp.sender == self.data.administrator, message="FA2_NOT_ADMIN")
 
+    @sp.private_lambda(with_storage=None, wrap_call=True)
     def check_token_exists(self, token_id):
         """Checks that the given token exists.
 
@@ -320,13 +314,9 @@ class DAOToken(sp.Contract):
         responsabilities.
 
         """
-        # Check that there is a proposed administrator
-        sp.verify(self.data.proposed_administrator.is_some(),
-                  message="FA_NO_NEW_ADMIN")
-
         # Check that the proposed administrator executed the entry point
-        sp.verify(sp.sender == self.data.proposed_administrator.open_some(),
-                  message="FA_NOT_PROPOSED_ADMIN")
+        sp.verify(sp.sender == self.data.proposed_administrator.open_some(
+            "FA_NO_NEW_ADMIN"), message="FA_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender
@@ -351,40 +341,6 @@ class DAOToken(sp.Contract):
         self.data.metadata[params.k] = params.v
 
     @sp.onchain_view(pure=True)
-    def token_exists(self, token_id):
-        """Checks if the token exists.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(token_id, sp.TNat)
-
-        # Return true if the token exists
-        sp.result(token_id == 0)
-
-    @sp.onchain_view(pure=True)
-    def count_tokens(self):
-        """Returns how many tokens are in this FA2 contract.
-
-        """
-        sp.result(sp.nat(1))
-
-    @sp.onchain_view(pure=True)
-    def get_balance(self, params):
-        """Returns the owner token balance.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            owner=sp.TAddress,
-            token_id=sp.TNat).layout(("owner", "token_id")))
-
-        # Check that the token exists
-        self.check_token_exists(params.token_id)
-
-        # Return the owner token balance
-        sp.result(self.data.ledger.get(params.owner, 0))
-
-    @sp.onchain_view(pure=True)
     def get_prior_balance(self, params):
         """Returns the owner token balance at a given block level.
 
@@ -392,29 +348,38 @@ class DAOToken(sp.Contract):
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
             owner=sp.TAddress,
-            level=sp.TNat).layout(("owner", "level")))
+            level=sp.TNat,
+            max_checkpoints=sp.TOption(sp.TNat)).layout(("owner", ("level", "max_checkpoints"))))
 
         # Check that the requested level is smaller than the current level
         sp.verify(params.level < sp.level, message="FA2_WRONG_LEVEL")
+
+        # Check that, if defined, max checkpoints is larger than zero
+        sp.verify(~params.max_checkpoints.is_some() | 
+                  (params.max_checkpoints.open_some() > 0),
+                  message="FA2_WRONG_MAX_CHECKPOINTS")
 
         # Check if the owner has any checkpoints
         with sp.if_(~self.data.n_checkpoints.contains(params.owner)):
             # No checkpoints implies zero balance
             sp.result(sp.nat(0))
         with sp.else_():
+            # Define the upper and lower checkpoint limits
+            lower = sp.local("lower", sp.nat(0))
+            upper = sp.local("upper", sp.as_nat(self.data.n_checkpoints[params.owner] - 1))
+
+            with sp.if_(params.max_checkpoints.is_some() & (params.max_checkpoints.open_some() <= upper.value)):
+                lower.value = sp.as_nat(upper.value - params.max_checkpoints.open_some() + 1)
+
             # Check if the requested level is older than the first checkpoint
-            with sp.if_(params.level < self.data.checkpoints[(params.owner, 0)].level):
+            with sp.if_(params.level < self.data.checkpoints[(params.owner, lower.value)].level):
                 # The balance was zero at the requested level
                 sp.result(sp.nat(0))
             with sp.else_():
                 # Perform a binary search to find the correct checkpoint
-                lower = sp.local("lower", 0)
-                upper = sp.local("upper", sp.as_nat(self.data.n_checkpoints[params.owner] - 1))
-                center = sp.local("center", 0)
-
                 with sp.while_(lower.value < upper.value):
-                    # Get the central index
-                    center.value = sp.as_nat(upper.value - (sp.as_nat(upper.value - lower.value) / 2))
+                    # Get the central index using the ceiling value
+                    center = sp.local("center", sp.as_nat(upper.value - (sp.as_nat(upper.value - lower.value) // 2)))
 
                     # Check in which half we should continue the search
                     with sp.if_(params.level < self.data.checkpoints[(params.owner, center.value)].level):
@@ -428,6 +393,22 @@ class DAOToken(sp.Contract):
                 sp.result(self.data.checkpoints[(params.owner, lower.value)].balance)
 
     @sp.onchain_view(pure=True)
+    def get_balance(self, params):
+        """Returns the owner token balance.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(params, sp.TRecord(
+            owner=sp.TAddress,
+            token_id=sp.TNat).layout(("owner", "token_id")))
+
+        # Check that the token exists
+        sp.verify(params.token_id == 0, message="FA2_TOKEN_UNDEFINED")
+
+        # Return the owner token balance
+        sp.result(self.data.ledger.get(params.owner, 0))
+
+    @sp.onchain_view(pure=True)
     def total_supply(self, token_id):
         """Returns the total supply for a given token id.
 
@@ -436,12 +417,12 @@ class DAOToken(sp.Contract):
         sp.set_type(token_id, sp.TNat)
 
         # Check that the token exists
-        self.check_token_exists(token_id)
+        sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
         # Return the token total supply
         sp.result(self.data.supply)
 
-    @sp.onchain_view(pure=True)
+    @sp.offchain_view(pure=True)
     def all_tokens(self):
         """Returns a list with all the token ids.
 
@@ -457,12 +438,12 @@ class DAOToken(sp.Contract):
         sp.set_type(params, DAOToken.OPERATOR_KEY_TYPE)
 
         # Check that the token exists
-        self.check_token_exists(params.token_id)
+        sp.verify(params.token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
         # Return true if the token operator exists
         sp.result(self.data.operators.contains(params))
 
-    @sp.onchain_view(pure=True)
+    @sp.offchain_view(pure=True)
     def token_metadata(self, token_id):
         """Returns the token metadata.
 
@@ -470,11 +451,9 @@ class DAOToken(sp.Contract):
         # Define the input parameter data type
         sp.set_type(token_id, sp.TNat)
 
-        # Check that the token exists
-        self.check_token_exists(token_id)
-
         # Return the token metadata
-        sp.result(self.data.token_metadata[token_id])
+        sp.result(self.data.token_metadata.get(
+            token_id, message="FA2_TOKEN_UNDEFINED"))
 
 
 sp.add_compilation_target("daoToken", DAOToken(
