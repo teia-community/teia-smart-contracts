@@ -11,6 +11,10 @@ class DAOToken(sp.Contract):
     The contract follows the FA2 standard specification:
     https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md
 
+    The contract makes used of the kolibi DAO implementation of token balance
+    checkpoints:
+    https://github.com/Hover-Labs/murmuration/blob/main/docs/token.md
+
     """
 
     TOKEN_METADATA_VALUE_TYPE = sp.TRecord(
