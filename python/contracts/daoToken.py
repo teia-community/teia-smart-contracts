@@ -42,7 +42,7 @@ class DAOToken(sp.Contract):
         balance=sp.TNat).layout(
             ("level", "balance"))
 
-    def __init__(self, administrator, metadata, token_metadata):
+    def __init__(self, administrator, metadata, token_metadata, max_supply, max_share):
         """Initializes the contract.
 
         """
@@ -56,6 +56,10 @@ class DAOToken(sp.Contract):
             ledger=sp.TBigMap(sp.TAddress, sp.TNat),
             # The token total supply
             supply=sp.TNat,
+            # The token maximum supply
+            max_supply=sp.TNat,
+            # The maximum number of tokens that a owner can have
+            max_share=sp.TNat,
             # The big map with the token metadata
             token_metadata=sp.TBigMap(
                 sp.TNat, DAOToken.TOKEN_METADATA_VALUE_TYPE),
@@ -75,6 +79,8 @@ class DAOToken(sp.Contract):
             metadata=metadata,
             ledger=sp.big_map(),
             supply=0,
+            max_supply=max_supply,
+            max_share=max_share,
             token_metadata=sp.big_map({
                 0: sp.record(token_id=0, token_info={"": token_metadata})}),
             operators=sp.big_map(),
@@ -100,7 +106,8 @@ class DAOToken(sp.Contract):
                 self.total_supply,
                 self.all_tokens,
                 self.is_operator,
-                self.token_metadata],
+                self.token_metadata,
+                self.get_prior_balance],
             "permissions": {
                 "operator": "owner-or-operator-transfer",
                 "receiver": "owner-no-hook",
@@ -183,6 +190,14 @@ class DAOToken(sp.Contract):
                 mint.to_, 0) + mint.amount
             self.data.supply += mint.amount
 
+            # Check that the balance is lower than the maximum share
+            sp.verify(self.data.ledger[mint.to_] < self.data.max_share,
+                      message="FA2_SHARE_EXCESS")
+
+            # Check that the total supply is not larger than the maximum supply
+            sp.verify(self.data.supply < self.data.max_supply,
+                      message="FA2_SUPPLY_EXCEEDED")
+
             # Add a balance checkpoint
             self.add_checkpoint(mint.to_)
 
@@ -227,6 +242,10 @@ class DAOToken(sp.Contract):
                     # Add the token amount to the new owner
                     self.data.ledger[tx.to_] = self.data.ledger.get(
                         tx.to_, 0) + tx.amount
+
+                    # Check that the balance is lower than the maximum share
+                    sp.verify(self.data.ledger[tx.to_] < self.data.max_share,
+                              message="FA2_SHARE_EXCESS")
 
                     # Add the new balance checkpoints
                     self.add_checkpoint(owner)
@@ -377,6 +396,7 @@ class DAOToken(sp.Contract):
                 sp.result(sp.nat(0))
             with sp.else_():
                 # Perform a binary search to find the correct checkpoint
+                # https://en.wikipedia.org/wiki/Binary_search_algorithm#Alternative_procedure
                 with sp.while_(lower.value < upper.value):
                     # Get the central index using the ceiling value
                     center = sp.local("center", sp.as_nat(upper.value - (sp.as_nat(upper.value - lower.value) // 2)))
@@ -459,4 +479,6 @@ class DAOToken(sp.Contract):
 sp.add_compilation_target("daoToken", DAOToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-    token_metadata=sp.utils.bytes_of_string("ipfs://bbb")))
+    token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
+    max_supply=1000000000000,
+    max_share=50000000000))

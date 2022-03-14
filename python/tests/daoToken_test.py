@@ -56,7 +56,9 @@ def get_test_environment():
     fa2 = daoTokenModule.DAOToken(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-        token_metadata=sp.utils.bytes_of_string("ipfs://bbb"))
+        token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
+        max_supply=1000000000000,
+        max_share=50000000000)
     scenario += fa2
 
     # Save all the variables in a test environment dictionary
@@ -120,6 +122,10 @@ def test_mint():
     fa2.mint([
         sp.record(to_=user1.address, token_id=0, amount=5),
         sp.record(to_=user3.address, token_id=1, amount=5)]).run(valid=False, sender=admin)
+
+    # Check that it's not possible to mint more than the allowed share of tokens
+    fa2.mint([
+        sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share)]).run(valid=False, sender=admin)
 
     # Mint again the token
     fa2.mint([
@@ -263,6 +269,18 @@ def test_transfer():
     scenario.verify(fa2.data.checkpoints[(user3.address, 2)].level == 40)
     scenario.verify(fa2.data.checkpoints[(user3.address, 2)].balance == 3 - 1 + 5)
     scenario.verify(fa2.total_supply(0) == editions)
+
+    # Mint a large amount of tokens
+    fa2.mint([
+        sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share / 2),
+        sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share / 2)]).run(sender=admin, level=50)
+
+    # Check that it's not possible to have more tokens than the allowed share
+    fa2.transfer([
+        sp.record(
+            from_=user1.address,
+            txs=[sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share / 2)])
+        ]).run(valid=False, sender=user1, level=50)
 
 
 @sp.add_test(name="Test complex transfer")
