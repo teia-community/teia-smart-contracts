@@ -7,4 +7,5 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/marketplace.py /tmp/contracts/marketplace
 ~/smartpy-cli/SmartPy.sh compile contracts/artistsCollaboration.py /tmp/contracts/artistsCollaboration
 ~/smartpy-cli/SmartPy.sh compile contracts/daoToken.py /tmp/contracts/daoToken
+~/smartpy-cli/SmartPy.sh compile contracts/daoTokenDrop.py /tmp/contracts/daoTokenDrop
 cd - > /dev/null
