@@ -198,6 +198,17 @@ class DAOTokenDrop(sp.Contract):
         # Reset the proposed administrator value
         self.data.proposed_administrator = sp.none
 
+    @sp.onchain_view(pure=True)
+    def claimed_tokens(self, address):
+        """Returns the number of tokens claimed by the address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(address, sp.TAddress)
+
+        # Return the number of claimed tokens
+        sp.result(self.data.claimed.get(address, 0))
+
 
 sp.add_compilation_target("daoTokenDrop", DAOTokenDrop(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
