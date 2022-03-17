@@ -118,6 +118,12 @@ def test_claim():
     scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == 1500)
     scenario.verify(daoToken.total_supply(0) == 1500)
 
+    # Check that the claim fails if the user sends some tez
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user1_1,
+        leaf=sp.pack(sp.record(address=user1, value=tokens_user1_1)))).run(
+            valid=False, sender=user1, amount=sp.tez(2), exception="DROP_TEZ_TRANSFER")
+
     # Check that the packing needs to be correct
     daoTokenDrop.claim(sp.record(
         proof=proof_user1_1,
@@ -193,6 +199,122 @@ def test_claim():
     scenario.verify(daoTokenDrop.claimed_tokens(user4) == 0)
 
 
+@sp.add_test(name="Test transfer")
+def test_transfer():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    external_user = testEnvironment["external_user"]
+    daoToken = testEnvironment["daoToken"]
+    daoTokenDrop = testEnvironment["daoTokenDrop"]
+
+    # Check that only the admin can transfer tokens
+    daoTokenDrop.transfer([
+        sp.record(to_=user1, token_id=0, amount=10),
+        sp.record(to_=user4, token_id=0, amount=20),
+        sp.record(to_=external_user.address, token_id=0, amount=30)]).run(
+        valid=False, sender=user1, exception="DROP_NOT_ADMIN")
+
+    # Transfer the tokens
+    daoTokenDrop.transfer([
+        sp.record(to_=user1, token_id=0, amount=10),
+        sp.record(to_=user4, token_id=0, amount=20),
+        sp.record(to_=external_user.address, token_id=0, amount=30)]).run(sender=admin)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == 10)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == 0)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user3, token_id=0)) == 0)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user4, token_id=0)) == 20)
+    scenario.verify(daoToken.get_balance(sp.record(owner=external_user.address, token_id=0)) == 30)
+    scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == sp.as_nat(
+        1500 - 10 - 20 - 30))
+    scenario.verify(daoTokenDrop.claimed_tokens(user1) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(user2) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(user3) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(user4) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(external_user.address) == 0)
+
+
+@sp.add_test(name="Test update merkle root")
+def test_update_merkle_root():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    daoToken = testEnvironment["daoToken"]
+    daoTokenDrop = testEnvironment["daoTokenDrop"]
+
+    # User 1 and user 2 their tokens
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user1_1,
+        leaf=sp.pack(sp.record(address=user1, value=tokens_user1_1)))).run(sender=user1)
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user2_1,
+        leaf=sp.pack(sp.record(address=user2, value=tokens_user2_1)))).run(sender=user2)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == tokens_user1_1)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == tokens_user2_1)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user3, token_id=0)) == 0)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user4, token_id=0)) == 0)
+    scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == sp.as_nat(
+        1500 - (tokens_user1_1 + tokens_user2_1)))
+    scenario.verify(daoTokenDrop.claimed_tokens(user1) == tokens_user1_1)
+    scenario.verify(daoTokenDrop.claimed_tokens(user2) == tokens_user2_1)
+    scenario.verify(daoTokenDrop.claimed_tokens(user3) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(user4) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(user5) == 0)
+
+    # Check that only the admin can update the Merkle tree root
+    daoTokenDrop.update_merkle_root(merkle_root_2).run(
+        valid=False, sender=user1, exception="DROP_NOT_ADMIN")
+
+    # Update the Merkle tree root to reflect a new drop distribution
+    daoTokenDrop.update_merkle_root(merkle_root_2).run(sender=admin)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoTokenDrop.data.merkle_root == merkle_root_2)
+
+    # Check that it's not possible anymore to use the previous proofs
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user3_1,
+        leaf=sp.pack(sp.record(address=user3, value=tokens_user3_1)))).run(
+            valid=False, sender=user3, exception="DROP_INVALID_MERKLE_PROOF")
+ 
+    # All the users claim their tokens
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user1_2,
+        leaf=sp.pack(sp.record(address=user1, value=tokens_user1_2)))).run(sender=user1)
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user2_2,
+        leaf=sp.pack(sp.record(address=user2, value=tokens_user2_2)))).run(sender=user2)
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user3_2,
+        leaf=sp.pack(sp.record(address=user3, value=tokens_user3_2)))).run(sender=user3)
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user4_2,
+        leaf=sp.pack(sp.record(address=user4, value=tokens_user4_2)))).run(sender=user4)
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user5_2,
+        leaf=sp.pack(sp.record(address=user5, value=tokens_user5_2)))).run(sender=user5)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == tokens_user1_2)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == tokens_user2_2)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user3, token_id=0)) == tokens_user3_2)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user4, token_id=0)) == tokens_user4_2)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user5, token_id=0)) == tokens_user5_2)
+    scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == sp.as_nat(
+        1500 - (tokens_user1_2 + tokens_user2_2 + tokens_user3_2 + tokens_user4_2 + tokens_user5_2)))
+    scenario.verify(daoTokenDrop.claimed_tokens(user1) == tokens_user1_2)
+    scenario.verify(daoTokenDrop.claimed_tokens(user2) == tokens_user2_2)
+    scenario.verify(daoTokenDrop.claimed_tokens(user3) == tokens_user3_2)
+    scenario.verify(daoTokenDrop.claimed_tokens(user4) == tokens_user4_2)
+    scenario.verify(daoTokenDrop.claimed_tokens(user5) == tokens_user5_2)
+
+
 @sp.add_test(name="Test transfer and accept administrator")
 def test_transfer_and_accept_administrator():
     # Get the test environment
@@ -206,14 +328,16 @@ def test_transfer_and_accept_administrator():
 
     # Check that only the admin can transfer the administrator
     new_administrator = user1
-    daoTokenDrop.transfer_administrator(new_administrator).run(valid=False, sender=user1)
+    daoTokenDrop.transfer_administrator(new_administrator).run(
+        valid=False, sender=user1, exception="DROP_NOT_ADMIN")
     daoTokenDrop.transfer_administrator(new_administrator).run(sender=admin)
 
     # Check that the proposed administrator is updated
     scenario.verify(daoTokenDrop.data.proposed_administrator.open_some() == new_administrator)
 
     # Check that only the proposed administrator can accept the administrator position
-    daoTokenDrop.accept_administrator().run(valid=False, sender=admin)
+    daoTokenDrop.accept_administrator().run(
+        valid=False, sender=admin, exception="DROP_NOT_PROPOSED_ADMIN")
     daoTokenDrop.accept_administrator().run(sender=user1)
 
     # Check that the administrator is updated
@@ -222,7 +346,8 @@ def test_transfer_and_accept_administrator():
 
     # Check that only the new administrator can propose a new administrator
     new_administrator = user2
-    daoTokenDrop.transfer_administrator(new_administrator).run(valid=False, sender=admin)
+    daoTokenDrop.transfer_administrator(new_administrator).run(
+        valid=False, sender=admin, exception="DROP_NOT_ADMIN")
     daoTokenDrop.transfer_administrator(new_administrator).run(sender=user1)
 
     # Check that the proposed administrator is updated

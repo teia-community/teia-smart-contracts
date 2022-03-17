@@ -862,3 +862,45 @@ def test_set_metadata():
     # Check that the two metadata entries are present
     scenario.verify(fa2.data.metadata[new_metadata.k] == new_metadata.v)
     scenario.verify(fa2.data.metadata[extra_metadata.k] == extra_metadata.v)
+
+
+@sp.add_test(name="Test add max share exception")
+def test_add_max_share_exception():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    user1 = testEnvironment["user1"]
+    user2 = testEnvironment["user2"]
+    fa2 = testEnvironment["fa2"]
+
+    # Check that it's not possible to mint more than the allowed share of tokens
+    fa2.mint([
+        sp.record(to_=admin.address, token_id=0, amount=fa2.data.max_share)]).run(valid=False, sender=admin)
+
+    # Add the admin address as an exception
+    fa2.add_max_share_exception(admin.address).run(sender=admin)
+
+    # Check that now is possible to mint more than the allowed share of tokens
+    fa2.mint([
+        sp.record(to_=admin.address, token_id=0, amount=(fa2.data.max_share + 100))]).run(sender=admin)
+
+    # Check that it's not possible to transfer more than the allowed share of tokens
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share)])
+        ]).run(valid=False, sender=admin)
+
+    # Add user 2 as an exception
+    fa2.add_max_share_exception(user2.address).run(sender=admin)
+
+    # Check that now is possible to transfer more than the allowed share of tokens
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share)])
+        ]).run(sender=admin)
+
+    # Check that only the admin can add exceptions
+    fa2.add_max_share_exception(user1.address).run(valid=False, sender=user2)

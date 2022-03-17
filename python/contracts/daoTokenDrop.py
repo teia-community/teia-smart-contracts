@@ -11,6 +11,7 @@ class DAOTokenDrop(sp.Contract):
     The main modifications are:
         - Possibility to update the Merkle tree.
         - Use of batch transfers, instead of a single transfer.
+        - On-chain view to get an address claimed tokens.
 
     """
 
