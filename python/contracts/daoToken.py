@@ -11,6 +11,10 @@ class DAOToken(sp.Contract):
     The contract follows the FA2 standard specification:
     https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md
 
+    The contract makes used of the kolibi DAO implementation of token balance
+    checkpoints:
+    https://github.com/Hover-Labs/murmuration/blob/main/docs/token.md
+
     """
 
     TOKEN_METADATA_VALUE_TYPE = sp.TRecord(
@@ -70,6 +74,8 @@ class DAOToken(sp.Contract):
                 DAOToken.CHECKPOINT_KEY_TYPE, DAOToken.CHECKPOINT_VALUE_TYPE),
             # The big map with the number of checkpoints per token owner
             n_checkpoints=sp.TBigMap(sp.TAddress, sp.TNat),
+            # The set of wallets that can own more tokens than the maximum share
+            max_share_exceptions=sp.TSet(sp.TAddress),
             # The proposed new administrator address
             proposed_administrator=sp.TOption(sp.TAddress)))
 
@@ -86,6 +92,7 @@ class DAOToken(sp.Contract):
             operators=sp.big_map(),
             checkpoints=sp.big_map(),
             n_checkpoints=sp.big_map(),
+            max_share_exceptions=sp.set([]),
             proposed_administrator=sp.none)
 
         # Build the TZIP-016 contract metadata
@@ -191,11 +198,12 @@ class DAOToken(sp.Contract):
             self.data.supply += mint.amount
 
             # Check that the balance is lower than the maximum share
-            sp.verify(self.data.ledger[mint.to_] < self.data.max_share,
+            sp.verify(self.data.max_share_exceptions.contains(mint.to_) | 
+                      (self.data.ledger[mint.to_] < self.data.max_share),
                       message="FA2_SHARE_EXCESS")
 
             # Check that the total supply is not larger than the maximum supply
-            sp.verify(self.data.supply < self.data.max_supply,
+            sp.verify(self.data.supply <= self.data.max_supply,
                       message="FA2_SUPPLY_EXCEEDED")
 
             # Add a balance checkpoint
@@ -244,7 +252,8 @@ class DAOToken(sp.Contract):
                         tx.to_, 0) + tx.amount
 
                     # Check that the balance is lower than the maximum share
-                    sp.verify(self.data.ledger[tx.to_] < self.data.max_share,
+                    sp.verify(self.data.max_share_exceptions.contains(tx.to_) | 
+                              (self.data.ledger[tx.to_] < self.data.max_share),
                               message="FA2_SHARE_EXCESS")
 
                     # Add the new balance checkpoints
@@ -358,6 +367,21 @@ class DAOToken(sp.Contract):
 
         # Update the contract metadata
         self.data.metadata[params.k] = params.v
+
+    @sp.entry_point
+    def add_max_share_exception(self, exception):
+        """Adds an exception to the set of addresses that can own more tokens
+        than the maximum share.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(exception, sp.TAddress)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Add the max share exception
+        self.data.max_share_exceptions.add(exception)
 
     @sp.onchain_view(pure=True)
     def get_prior_balance(self, params):
