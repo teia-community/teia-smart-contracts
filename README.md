@@ -10,6 +10,7 @@
 | [Artists collaboration](python/contracts/artistsCollaboration.py) | | Prototype |
 | [DAO token](python/contracts/daoToken.py) | | Prototype |
 | [DAO token distributor](python/contracts/daoTokenDrop.py) | | Prototype |
+| [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -32,6 +33,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/artistsCollaboration.py ../output/contracts/artistsCollaboration --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoToken.py ../output/contracts/daoToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTokenDrop.py ../output/contracts/daoTokenDrop --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py ../output/contracts/daoGovernance --html --purge
 ```
 
 ## Execute the tests
