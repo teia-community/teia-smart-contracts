@@ -41,11 +41,17 @@ class DAOGovernance(sp.Contract):
     GOVERNANCE_PARAMETERS_TYPE = sp.TRecord(
         # The proposal voting period in days
         voting_period=sp.TNat,
-        # The percentage of votes for super-majority
-        percentage_for_super_majority=sp.TNat,
+        # The percentage of positive votes needed to reach super-majority
+        supermajority=sp.TNat,
+        # The representatives vote share percentage over the required quorum
+        representatives_share=sp.TNat,
         # The quorum cap
-        quorum_cap=sp.TNat).layout(
-            ("voting_period", ("percentage_for_super_majority", "quorum_cap")))
+        quorum_cap=sp.TRecord(
+            # The minimum possible quorum value
+            min=sp.TNat,
+            # The maximum possible quorum value
+            max=sp.TNat).layout(("min", "max"))).layout(
+                ("voting_period", ("supermajority", ("representatives_share", "quorum_cap"))))
 
     LAMBDA_FUNCTION_TYPE = sp.TLambda(sp.TUnit, sp.TList(sp.TOperation))
 
@@ -127,7 +133,7 @@ class DAOGovernance(sp.Contract):
         amount=sp.TNat).layout(
             ("to_", ("token_id", "amount")))
 
-    def __init__(self, metadata, token, representatives):
+    def __init__(self, metadata, token, representatives, quorum, governance_parameters):
         """Initializes the contract.
 
         """
@@ -161,11 +167,8 @@ class DAOGovernance(sp.Contract):
             metadata=metadata,
             token=token,
             representatives=representatives,
-            quorum=80,
-            governance_parameters=sp.record(
-                voting_period=10,
-                percentage_for_super_majority=10,
-                quorum_cap=10),
+            quorum=quorum,
+            governance_parameters=governance_parameters,
             proposals=sp.big_map(),
             token_votes=sp.big_map(),
             representatives_votes=sp.big_map(),
@@ -379,44 +382,44 @@ class DAOGovernance(sp.Contract):
                   message="DAO_INEXISTENT_PROPOSAL")
 
         # Check that the proposal voting period didn't expire
-        end_date = self.data.proposals[params.proposal_id].timestamp.add_days(
+        proposal = self.data.proposals[params.proposal_id]
+        end_date = proposal.timestamp.add_days(
             sp.to_int(self.data.governance_parameters.voting_period))
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
         # Check that the member didn't vote the proposal before
-        sp.verify(~self.data.votes.contains((params.proposal_id, sp.sender)),
+        vote_key = sp.pair(params.proposal_id, sp.sender)
+        sp.verify(~self.data.votes.contains(vote_key),
                   message="DAO_ALREADY_VOTED")
 
         # Get the member DAO token balance at the proposal creation
         token_balance = sp.compute(self.get_prior_token_balance(
-            self.data.proposals[params.proposal_id].level, params.max_checkpoints))
+            proposal.level, params.max_checkpoints))
 
         # Check that the token balance is not zero
         sp.verify(token_balance > 0, message="DAO_ZERO_BALANCE")
 
         # Calculate the voting weight (for the moment we assume linear weight)
-        voting_weight = token_balance
+        weight = token_balance
 
         # Update the DAO token holders vote summary
         new_votes = sp.local(
             "new_votes", self.data.token_votes[params.proposal_id])
-        new_votes.value.total += voting_weight
+        new_votes.value.total += weight
         new_votes.value.participation += 1
 
         with params.vote.match_cases() as arg:
             with arg.match("yes"):
-                new_votes.value.positive += voting_weight
+                new_votes.value.positive += weight
             with arg.match("no"):
-                new_votes.value.negative += voting_weight
+                new_votes.value.negative += weight
             with arg.match("abstain"):
-                new_votes.value.abstain += voting_weight
+                new_votes.value.abstain += weight
 
         self.data.token_votes[params.proposal_id] = new_votes.value
 
         # Add the vote to the votes big map
-        self.data.votes[(params.proposal_id, sp.sender)] = sp.record(
-            vote=params.vote,
-            weight=voting_weight)
+        self.data.votes[vote_key] = sp.record(vote=params.vote, weight=weight)
 
     @sp.entry_point
     def representatives_vote(self, params):
@@ -444,7 +447,8 @@ class DAOGovernance(sp.Contract):
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
         # Check that the representative didn't vote the proposal before
-        sp.verify(~self.data.votes.contains((params.proposal_id, params.representative)),
+        vote_key = sp.pair(params.proposal_id, params.representative)
+        sp.verify(~self.data.votes.contains(vote_key),
                   message="DAO_ALREADY_VOTED")
 
         # Update the representatives vote summary
@@ -464,9 +468,58 @@ class DAOGovernance(sp.Contract):
         self.data.representatives_votes[params.proposal_id] = new_votes.value
 
         # Add the vote to the votes big map
-        self.data.votes[(params.proposal_id, params.representative)] = sp.record(
-            vote=params.vote,
-            weight=1)
+        self.data.votes[vote_key] = sp.record(vote=params.vote, weight=1)
+
+    @sp.entry_point
+    def evaluate_voting_result(self, proposal_id):
+        """Evaluates the voting result of a given proposal.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(proposal_id, sp.TNat)
+
+        # Check that one of the DAO members executed the entry point
+        self.check_is_member()
+
+        # Check that the proposal voting period has finished
+        end_date = self.data.proposals[proposal_id].timestamp.add_days(
+            sp.to_int(self.data.governance_parameters.voting_period))
+        sp.verify(sp.now > end_date, message="DAO_OPEN_PROPOSAL")
+
+        # Get the votes summaries for the DAO token holders and representatives
+        token_votes = sp.compute(self.data.token_votes[proposal_id])
+        representatives_votes = sp.compute(self.data.representatives_votes[proposal_id])
+
+        # Calculate the representatives votes based on the current quorum
+        representatives_total = (self.data.quorum * self.data.governance_parameters.representatives_share) // 100
+        representatives_positive = (representatives_total * representatives_votes.positive) // representatives_votes.total
+        representatives_negative = (representatives_total * representatives_votes.negative) // representatives_votes.total
+
+        # Count the total votes
+        total = token_votes.total + representatives_total
+        positive = token_votes.positive + representatives_positive
+        negative = token_votes.negative + representatives_negative
+
+        # Check if the proposal passed the required thresholds to be approved
+        passed_supermajority = positive >= (((positive + negative) * self.data.governance_parameters.supermajority) // 100)
+        passed_quorum = total >= self.data.quorum
+
+        # Set the proposal as approved or rejected depending of the result
+        with sp.if_(passed_supermajority & passed_quorum):
+            self.data.proposals[proposal_id].status = sp.variant("approved", sp.unit)
+        with sp.else_():
+            self.data.proposals[proposal_id].status = sp.variant("rejected", sp.unit)
+
+        # Calculate the new quorum value
+        new_quorum = sp.local("new_quorum", (self.data.quorum * 80 + total * 20) // 100)
+
+        with sp.if_(new_quorum.value < self.data.governance_parameters.quorum_cap.min):
+            new_quorum.value = self.data.governance_parameters.quorum_cap.min
+
+        with sp.if_(new_quorum.value > self.data.governance_parameters.quorum_cap.max):
+            new_quorum.value = self.data.governance_parameters.quorum_cap.max
+
+        self.data.quorum = new_quorum.value
 
     @sp.entry_point
     def execute_proposal(self, proposal_id):
@@ -550,11 +603,12 @@ class DAOGovernance(sp.Contract):
             member=sp.TAddress).layout(("proposal_id", "member")))
 
         # Check that the vote is present in the votes big map
-        sp.verify(self.data.votes.contains((params.proposal_id, params.member)),
+        vote_key = sp.pair(params.proposal_id, params.member)
+        sp.verify(self.data.votes.contains(vote_key),
                   message="DAO_NO_MEMBER_VOTE")
 
         # Return the member's vote
-        sp.result(self.data.votes[(params.proposal_id, params.member)])
+        sp.result(self.data.votes[vote_key])
 
     @sp.onchain_view()
     def has_voted(self, params):
@@ -591,4 +645,10 @@ class DAOGovernance(sp.Contract):
 sp.add_compilation_target("dao", DAOGovernance(
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
     token=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa"),
-    representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekbb")))
+    representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekbb"),
+    quorum=8000,
+    governance_parameters=sp.record(
+        voting_period=10,
+        supermajority=80,
+        representatives_share=30,
+        quorum_cap=sp.record(min=1000, max=100000))))
