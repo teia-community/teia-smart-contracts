@@ -8,4 +8,6 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/artistsCollaboration.py /tmp/contracts/artistsCollaboration
 ~/smartpy-cli/SmartPy.sh compile contracts/daoToken.py /tmp/contracts/daoToken
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTokenDrop.py /tmp/contracts/daoTokenDrop
+~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py /tmp/contracts/daoGovernance
+~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py /tmp/contracts/daoTreasury
 cd - > /dev/null
