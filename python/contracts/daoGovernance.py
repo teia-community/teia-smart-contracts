@@ -17,6 +17,21 @@ class DAOGovernance(sp.Contract):
 
     """
 
+    GOVERNANCE_PARAMETERS_TYPE = sp.TRecord(
+        # The proposal voting period in days
+        voting_period=sp.TNat,
+        # The percentage of positive votes needed to reach super-majority
+        supermajority=sp.TNat,
+        # The representatives vote share percentage relative to the quorum
+        representatives_share=sp.TNat,
+        # The minimum perion between quorum updates in days
+        quorum_update_period=sp.TNat,
+        # The minimum possible quorum value
+        min_quorum=sp.TNat,
+        # The maximum possible quorum value
+        max_quorum=sp.TNat).layout(
+            ("voting_period", ("supermajority", ("representatives_share", ("quorum_update_period", ("min_quorum", "max_quorum"))))))
+
     PROPOSAL_KIND_TYPE = sp.TVariant(
         # A proposal in the form of text to be voted for
         text=sp.TUnit,
@@ -24,8 +39,6 @@ class DAOGovernance(sp.Contract):
         transfer_mutez=sp.TUnit,
         # A proposal to transfer a token from the DAO treasury to other accounts
         transfer_token=sp.TUnit,
-        # A proposal to update the DAO governance parameters
-        update_governance=sp.TUnit,
         # A proposal to execute a lambda function
         lambda_function=sp.TUnit)
 
@@ -49,21 +62,6 @@ class DAOGovernance(sp.Contract):
             destination=sp.TAddress).layout(("amount", "destination")))).layout(
                 ("fa2", ("token_id", "distribution")))
 
-    GOVERNANCE_PARAMETERS_TYPE = sp.TRecord(
-        # The proposal voting period in days
-        voting_period=sp.TNat,
-        # The percentage of positive votes needed to reach super-majority
-        supermajority=sp.TNat,
-        # The representatives vote share percentage relative to the quorum
-        representatives_share=sp.TNat,
-        # The minimum perion between quorum updates in days
-        quorum_update_period=sp.TNat,
-        # The minimum possible quorum value
-        min_quorum=sp.TNat,
-        # The maximum possible quorum value
-        max_quorum=sp.TNat).layout(
-            ("voting_period", ("supermajority", ("representatives_share", ("quorum_update_period", ("min_quorum", "max_quorum"))))))
-
     LAMBDA_FUNCTION_TYPE = sp.TLambda(sp.TUnit, sp.TList(sp.TOperation))
 
     PROPOSAL_PARAMETERS_TYPE = sp.TRecord(
@@ -71,11 +69,9 @@ class DAOGovernance(sp.Contract):
         mutez_transfers=sp.TOption(MUTEZ_TRANSFERS_TYPE),
         # The list of token transfers
         token_transfers=sp.TOption(TOKEN_TRANSFERS_TYPE),
-        # The new governance parameters
-        governance=sp.TOption(GOVERNANCE_PARAMETERS_TYPE),
         # The lambda function to execute
         lambda_function=sp.TOption(LAMBDA_FUNCTION_TYPE)).layout(
-            ("mutez_transfers", ("token_transfers", ("governance", "lambda_function"))))
+            ("mutez_transfers", ("token_transfers", "lambda_function")))
 
     PROPOSAL_STATUS_TYPE = sp.TVariant(
         # The status for proposals that are open and can still be voted
@@ -131,7 +127,7 @@ class DAOGovernance(sp.Contract):
     VOTE_TYPE = sp.TRecord(
         # The user vote: yes, no or abstain
         vote=VOTE_KIND_TYPE,
-        # The vote weight based on their DAO token balance (0 for representatives)
+        # The vote weight based on the DAO token balance (0 for representatives)
         weight=sp.TNat).layout(
             ("vote", "weight"))
 
@@ -216,8 +212,7 @@ class DAOGovernance(sp.Contract):
                   message="DAO_NOT_MEMBER")
 
     def add_proposal(self, kind, title, description, mutez_transfers=sp.none,
-                     token_transfers=sp.none, governance=sp.none,
-                     lambda_function=sp.none):
+                     token_transfers=sp.none, lambda_function=sp.none):
         """Adds a new proposal to the proposals and vote summaries big maps.
 
         """
@@ -229,7 +224,6 @@ class DAOGovernance(sp.Contract):
             parameters=sp.record(
                 mutez_transfers=mutez_transfers,
                 token_transfers=token_transfers,
-                governance=governance,
                 lambda_function=lambda_function),
             issuer=sp.sender,
             timestamp=sp.now,
@@ -317,28 +311,6 @@ class DAOGovernance(sp.Contract):
             title=params.title,
             description=params.description,
             token_transfers=sp.some(params.token_transfers))
-
-    @sp.entry_point
-    def update_governance_proposal(self, params):
-        """Adds a new update governance proposal to the proposals big map.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            title=sp.TBytes,
-            description=sp.TBytes,
-            governance=DAOGovernance.GOVERNANCE_PARAMETERS_TYPE).layout(
-                ("title", ("description", "governance"))))
-
-        # Check that one of the DAO members executed the entry point
-        self.check_is_member()
-
-        # Add the proposal
-        self.add_proposal(
-            kind="update_governance",
-            title=params.title,
-            description=params.description,
-            governance=sp.some(params.governance))
 
     @sp.entry_point
     def lambda_function_proposal(self, params):
@@ -584,14 +556,53 @@ class DAOGovernance(sp.Contract):
                 amount=sp.mutez(0),
                 destination=transfer_token_handle)
 
-        with sp.if_(proposal.value.kind.is_variant("update_governance")):
-            # Update the DAO governance parameters
-            self.data.governance_parameters = proposal.value.parameters.governance.open_some()
-
         with sp.if_(proposal.value.kind.is_variant("lambda_function")):
             # Execute the lambda function
             operations = proposal.value.parameters.lambda_function.open_some()(sp.unit)
             sp.add_operations(operations)
+
+    @sp.entry_point
+    def set_treasury(self, new_treasury):
+        """Updates the DAO treasury contract address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_treasury, sp.TAddress)
+
+        # Check that the DAO itself executed the entry point
+        sp.verify(sp.sender == sp.self_address, message="DAO_NOT_DAO")
+
+        # Update the DAO treasury contract address
+        self.data.treasury = new_treasury
+
+    @sp.entry_point
+    def set_representatives(self, new_representatives):
+        """Updates the community representatives contract address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_representatives, sp.TAddress)
+
+        # Check that the DAO itself executed the entry point
+        sp.verify(sp.sender == sp.self_address, message="DAO_NOT_DAO")
+
+        # Update the representatives contract address
+        self.data.representatives = new_representatives
+
+    @sp.entry_point
+    def set_governance_parameters(self, new_governance_parameters):
+        """Updates the DAO governance parameters.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_governance_parameters,
+                    DAOGovernance.GOVERNANCE_PARAMETERS_TYPE)
+
+        # Check that the DAO itself executed the entry point
+        sp.verify(sp.sender == sp.self_address, message="DAO_NOT_DAO")
+
+        # Update the governance parameters
+        self.data.governance_parameters = new_governance_parameters
 
     @sp.onchain_view()
     def get_proposal_count(self):
@@ -654,8 +665,8 @@ sp.add_compilation_target("dao", DAOGovernance(
     representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekcc"),
     quorum=8000,
     governance_parameters=sp.record(
-        voting_period=10,
-        supermajority=80,
+        voting_period=5,
+        supermajority=70,
         representatives_share=30,
         quorum_update_period=10,
         min_quorum=1000,

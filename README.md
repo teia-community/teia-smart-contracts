@@ -34,6 +34,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoToken.py ../output/contracts/daoToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTokenDrop.py ../output/contracts/daoTokenDrop --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py ../output/contracts/daoGovernance --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py ../output/contracts/daoTreasury --html --purge
 ```
 
 ## Execute the tests
