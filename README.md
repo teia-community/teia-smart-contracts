@@ -11,6 +11,7 @@
 | [DAO token](python/contracts/daoToken.py) | | Prototype |
 | [DAO token distributor](python/contracts/daoTokenDrop.py) | | Prototype |
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
+| [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 
 
 ## SmartPy installation
