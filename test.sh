@@ -8,4 +8,5 @@ cd python
 ~/smartpy-cli/SmartPy.sh test tests/artistsCollaboration_test.py /tmp/tests/artistsCollaboration
 ~/smartpy-cli/SmartPy.sh test tests/daoToken_test.py /tmp/tests/daoToken
 ~/smartpy-cli/SmartPy.sh test tests/daoTokenDrop_test.py /tmp/tests/daoTokenDrop
+~/smartpy-cli/SmartPy.sh test tests/representatives_test.py /tmp/tests/representatives
 cd - > /dev/null

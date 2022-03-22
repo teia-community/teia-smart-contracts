@@ -10,4 +10,5 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTokenDrop.py /tmp/contracts/daoTokenDrop
 ~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py /tmp/contracts/daoGovernance
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py /tmp/contracts/daoTreasury
+~/smartpy-cli/SmartPy.sh compile contracts/representatives.py /tmp/contracts/representatives
 cd - > /dev/null
