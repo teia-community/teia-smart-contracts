@@ -12,6 +12,7 @@
 | [DAO token distributor](python/contracts/daoTokenDrop.py) | | Prototype |
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
+| [DAO representatives](python/contracts/representatives.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -36,6 +37,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTokenDrop.py ../output/contracts/daoTokenDrop --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py ../output/contracts/daoGovernance --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py ../output/contracts/daoTreasury --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
 ```
 
 ## Execute the tests
@@ -50,4 +52,5 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/artistsCollaboration_test.py ../output/tests/artistsCollaboration --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/daoToken_test.py ../output/tests/daoToken --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/daoTokenDrop_test.py ../output/tests/daoTokenDrop --html --purge
+~/smartpy-cli/SmartPy.sh test tests/representatives_test.py ../output/tests/representatives --html --purge
 ```
