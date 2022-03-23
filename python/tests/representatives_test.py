@@ -108,13 +108,13 @@ def test_default_entripoint():
     representatives = testEnvironment["representatives"]
 
     # Check that representatives can send tez to the contract
-    scenario += representatives.default(sp.unit).run(sender=user1, amount=sp.tez(3))
+    representatives.default(sp.unit).run(sender=user1, amount=sp.tez(3))
 
     # Check that the tez are now part of the contract balance
     scenario.verify(representatives.balance == sp.tez(10 + 3))
 
     # Check that non-representatives can also send tez to the contract
-    scenario += representatives.default(sp.unit).run(sender=non_user, amount=sp.tez(5))
+    representatives.default(sp.unit).run(sender=non_user, amount=sp.tez(5))
 
     # Check that the tez have been added to the contract balance
     scenario.verify(representatives.balance == sp.tez(10 + 3 + 5))
@@ -145,10 +145,10 @@ def test_create_vote_and_execute_proposal():
     scenario.verify(representatives.get_proposal_count() == 0)
 
     # Check that only users can submit proposals
-    scenario += representatives.add_user_proposal(non_user.address).run(valid=False, sender=non_user)
+    representatives.add_user_proposal(non_user.address).run(valid=False, sender=non_user)
 
     # Create the add user proposal with one of the representatives
-    scenario += representatives.add_user_proposal(non_user.address).run(sender=user1)
+    representatives.add_user_proposal(non_user.address).run(sender=user1)
 
     # Check that the proposal has been added to the proposals big map
     scenario.verify(representatives.data.proposals.contains(0))
@@ -160,12 +160,12 @@ def test_create_vote_and_execute_proposal():
     scenario.verify(~representatives.get_proposal(0).executed)
 
     # The first 3 users vote the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user3)
 
     # Check that the non-user cannot vote the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(valid=False, sender=non_user)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(valid=False, sender=non_user)
 
     # Check that the votes have been added to the votes big map
     scenario.verify(representatives.data.votes[(0, user1.address)] == True)
@@ -182,32 +182,32 @@ def test_create_vote_and_execute_proposal():
     scenario.verify(~representatives.data.proposals[0].executed)
 
     # The second user changes their vote
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
 
     # Check that the votes have been updated
     scenario.verify(representatives.data.votes[(0, user2.address)] == False)
     scenario.verify(representatives.data.proposals[0].positive_votes == 1)
 
     # The third user also changes their vote
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
 
     # Check that the votes have been updated
     scenario.verify(representatives.data.votes[(0, user3.address)] == True)
     scenario.verify(representatives.data.proposals[0].positive_votes == 2)
 
     # Check that voting twice positive only counts as one vote
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
     scenario.verify(representatives.data.proposals[0].positive_votes == 2)
 
     # Check that voting twice negative doesn't modify the result
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
     scenario.verify(representatives.data.proposals[0].positive_votes == 2)
 
     # Check that the proposal cannot be executed because it doesn't have enough positive votes
-    scenario += representatives.execute_proposal(0).run(valid=False, sender=user1)
+    representatives.execute_proposal(0).run(valid=False, sender=user1)
 
     # The 4th user votes positive
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Check that the vote has been added
     scenario.verify(representatives.has_voted(sp.record(proposal_id=0, user=user4.address)))
@@ -216,22 +216,22 @@ def test_create_vote_and_execute_proposal():
     scenario.verify(~representatives.data.proposals[0].executed)
 
     # Check that the proposal can only be executed by one of the users
-    scenario += representatives.execute_proposal(0).run(valid=False, sender=non_user)
+    representatives.execute_proposal(0).run(valid=False, sender=non_user)
 
     # Execute the proposal with one of the users
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the proposal is listed as executed
     scenario.verify(representatives.data.proposals[0].executed)
     scenario.verify(representatives.get_proposal(0).executed)
 
     # Check that the proposal cannot be voted or executed anymore
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(valid=False, sender=user1)
-    scenario += representatives.execute_proposal(0).run(valid=False, sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(valid=False, sender=user1)
+    representatives.execute_proposal(0).run(valid=False, sender=user1)
 
     # Check that the new user can create a new proposal and vote it
-    scenario += representatives.remove_user_proposal(user1.address).run(sender=non_user, now=sp.timestamp(0))
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=non_user, now=sp.timestamp(1000))
+    representatives.remove_user_proposal(user1.address).run(sender=non_user, now=sp.timestamp(0))
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=non_user, now=sp.timestamp(1000))
 
     # Check that the proposal and vote have been added to the big maps
     scenario.verify(representatives.data.proposals.contains(1))
@@ -245,14 +245,14 @@ def test_create_vote_and_execute_proposal():
     scenario.verify(representatives.has_voted(sp.record(proposal_id=1, user=non_user.address)))
 
     # The other users vote the proposal
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user1, now=sp.timestamp(2000))
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user2, now=sp.timestamp(3000))
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user3, now=sp.timestamp(4000))
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user4, now=sp.timestamp(0).add_days(3))
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user1, now=sp.timestamp(2000))
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user2, now=sp.timestamp(3000))
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user3, now=sp.timestamp(4000))
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user4, now=sp.timestamp(0).add_days(3))
 
     # Check that is not possible to vote or execute the proposal when it has expired
-    scenario += representatives.vote_proposal(proposal_id=1, approval=False).run(valid=False, sender=user1, now=sp.timestamp(1).add_days(3))
-    scenario += representatives.execute_proposal(1).run(valid=False, sender=user1, now=sp.timestamp(100).add_days(3))
+    representatives.vote_proposal(proposal_id=1, approval=False).run(valid=False, sender=user1, now=sp.timestamp(1).add_days(3))
+    representatives.execute_proposal(1).run(valid=False, sender=user1, now=sp.timestamp(100).add_days(3))
 
 
 @sp.add_test(name="Test text proposal")
@@ -268,16 +268,16 @@ def test_text_proposal():
 
     # Add a text proposal
     text = sp.pack("ipfs://zzz")
-    scenario += representatives.text_proposal(text).run(sender=user1)
+    representatives.text_proposal(text).run(sender=user1)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the proposal is listed as executed
     scenario.verify(representatives.data.proposals[0].executed)
@@ -305,16 +305,16 @@ def test_transfer_mutez_proposal():
     mutez_transfers = sp.list([
         sp.record(amount=sp.tez(3), destination=recipient1.address),
         sp.record(amount=sp.tez(2), destination=recipient2.address)])
-    scenario += representatives.transfer_mutez_proposal(mutez_transfers).run(sender=user1)
+    representatives.transfer_mutez_proposal(mutez_transfers).run(sender=user1)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the proposal is listed as executed
     scenario.verify(representatives.data.proposals[0].executed)
@@ -347,14 +347,14 @@ def test_transfer_token_proposal():
     scenario += fa2
 
     # Mint one token
-    scenario += fa2.mint(
+    fa2.mint(
         address=user1.address,
         token_id=sp.nat(0),
         amount=sp.nat(100),
         token_info={"" : sp.utils.bytes_of_string("ipfs://bbb")}).run(sender=admin)
 
     # The first user transfers 20 editions of the token to the representatives
-    scenario += fa2.transfer(sp.list([sp.record(
+    fa2.transfer(sp.list([sp.record(
         from_=user1.address,
         txs=sp.list([sp.record(
             to_=representatives.address,
@@ -376,16 +376,16 @@ def test_transfer_token_proposal():
         distribution=sp.list([
             sp.record(amount=sp.nat(5), destination=receptor1.address),
             sp.record(amount=sp.nat(1), destination=receptor2.address)]))
-    scenario += representatives.transfer_token_proposal(token_transfers).run(sender=user3)
+    representatives.transfer_token_proposal(token_transfers).run(sender=user3)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the proposal is listed as executed
     scenario.verify(representatives.data.proposals[0].executed)
@@ -409,48 +409,48 @@ def test_minimum_votes_proposal():
     representatives = testEnvironment["representatives"]
 
     # Check that the minimum votes cannot be set to 0
-    scenario += representatives.minimum_votes_proposal(0).run(valid=False, sender=user4)
+    representatives.minimum_votes_proposal(0).run(valid=False, sender=user4)
 
     # Add a minimum votes proposal
-    scenario += representatives.minimum_votes_proposal(4).run(sender=user4)
+    representatives.minimum_votes_proposal(4).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the minimum votes parameter has been updated
     scenario.verify(representatives.data.minimum_votes == 4)
     scenario.verify(representatives.get_minimum_votes() == 4)
 
     # Propose a minimum votes proposal larger than the number of users
-    scenario += representatives.minimum_votes_proposal(10).run(sender=user4)
+    representatives.minimum_votes_proposal(10).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=1, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=1, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user4)
 
     # Check that the proposal can't be executed because the number of users is smaller
     # than the proposed minimum votes
-    scenario += representatives.execute_proposal(1).run(valid=False, sender=user3)
+    representatives.execute_proposal(1).run(valid=False, sender=user3)
 
     # Add a remove user proposal
-    scenario += representatives.remove_user_proposal(user1.address).run(sender=user4)
+    representatives.remove_user_proposal(user1.address).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user2)
+    representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=2, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(2).run(sender=user3)
+    representatives.execute_proposal(2).run(sender=user3)
 
     # Check that the minimum votes parameter has been updated
     scenario.verify(representatives.data.minimum_votes == 3)
@@ -469,19 +469,19 @@ def test_expiration_time_proposal():
     representatives = testEnvironment["representatives"]
 
     # Check that the expiration time cannot be set to 0
-    scenario += representatives.expiration_time_proposal(0).run(valid=False, sender=user4)
+    representatives.expiration_time_proposal(0).run(valid=False, sender=user4)
 
     # Add an expiration time proposal
-    scenario += representatives.expiration_time_proposal(100).run(sender=user4)
+    representatives.expiration_time_proposal(100).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the expiration time parameter has been updated
     scenario.verify(representatives.data.expiration_time == 100)
@@ -503,19 +503,19 @@ def test_add_user_proposal():
     user5 = sp.test_account("user5")
 
     # Check that it's not possible to add the same user twice
-    scenario += representatives.add_user_proposal(user1.address).run(valid=False, sender=user4)
+    representatives.add_user_proposal(user1.address).run(valid=False, sender=user4)
 
     # Add a add user proposal
-    scenario += representatives.add_user_proposal(user5.address).run(sender=user4)
+    representatives.add_user_proposal(user5.address).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that now there are 5 users
     scenario.verify(sp.len(representatives.data.users.elements()) == 5)
@@ -539,19 +539,19 @@ def test_remove_user_proposal():
     user5 = sp.test_account("user5")
 
     # Check that it's not possible to remove a user that is not in the representatives
-    scenario += representatives.remove_user_proposal(user5.address).run(valid=False, sender=user4)
+    representatives.remove_user_proposal(user5.address).run(valid=False, sender=user4)
 
     # Add a remove user proposal
-    scenario += representatives.remove_user_proposal(user2.address).run(sender=user4)
+    representatives.remove_user_proposal(user2.address).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that now there are 3 users
     scenario.verify(sp.len(representatives.data.users.elements()) == 3)
@@ -582,16 +582,16 @@ def test_lambda_function_proposal():
         sp.result([sp.transfer_operation(sp.nat(2), sp.mutez(0), dummyContractHandle)])
 
     # Add a lambda proposal
-    scenario += representatives.lambda_function_proposal(dummy_lambda_function).run(sender=user4)
+    representatives.lambda_function_proposal(dummy_lambda_function).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the dummy contract storage has been updated to the correct vale
     scenario.verify(dummyContract.data.x == 2)
@@ -623,16 +623,16 @@ def test_set_dao():
     scenario.verify(representatives.data.dao == dao.address)
 
     # Add a lambda proposal
-    scenario += representatives.lambda_function_proposal(dao_lambda_function).run(sender=user4)
+    representatives.lambda_function_proposal(dao_lambda_function).run(sender=user4)
 
     # Vote for the proposal
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
-    scenario += representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user3)
+    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
 
     # Execute the proposal
-    scenario += representatives.execute_proposal(0).run(sender=user3)
+    representatives.execute_proposal(0).run(sender=user3)
 
     # Check that the DAO address has been updated
     scenario.verify(representatives.data.dao == new_dao.address)

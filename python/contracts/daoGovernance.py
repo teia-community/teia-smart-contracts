@@ -209,10 +209,19 @@ class DAOGovernance(sp.Contract):
         """Gets the sender token balance calling the DAO token on-chain view.
 
         """
+        param = sp.set_type_expr(
+            sp.record(
+                owner=sp.sender,
+                token_id=sp.nat(0)),
+            sp.TRecord(
+                owner=sp.TAddress,
+                token_id=sp.TNat).layout(
+                    ("owner", "token_id")))
+
         return sp.view(
             name="get_balance",
             address=self.data.token,
-            param=sp.record(owner=sp.sender, token_id=sp.nat(0)),
+            param=param,
             t=sp.TNat).open_some()
 
     def get_prior_token_balance(self, level, max_checkpoints):
@@ -220,11 +229,21 @@ class DAOGovernance(sp.Contract):
         view.
 
         """
+        param = sp.set_type_expr(
+            sp.record(
+                owner=sp.sender,
+                level=level,
+                max_checkpoints=max_checkpoints),
+            sp.TRecord(
+                owner=sp.TAddress,
+                level=sp.TNat,
+                max_checkpoints=sp.TOption(sp.TNat)).layout(
+                    ("owner", ("level", "max_checkpoints"))))
+
         return sp.view(
             name="get_prior_balance",
             address=self.data.token,
-            param=sp.record(
-                owner=sp.sender, level=level, max_checkpoints=max_checkpoints),
+            param=param,
             t=sp.TNat).open_some()
 
     def transfer_tokens(self, from_, to_, amount):
@@ -288,6 +307,9 @@ class DAOGovernance(sp.Contract):
 
         sp.verify(valid_parameters.value, message="DAO_WRONG_PARAMETERS")
 
+        # Check that one of the DAO members executed the entry point
+        sp.verify(self.get_token_balance() > 0, message="DAO_NOT_MEMBER")
+
         # Check if it's necessary to escrow DAO tokens to create proposals
         with sp.if_(self.data.governance_parameters.escrow_amount > 0):
             # Transfer the DAO tokens from the sender to the DAO contract
@@ -295,9 +317,6 @@ class DAOGovernance(sp.Contract):
                 from_=sp.sender,
                 to_=sp.self_address,
                 amount=self.data.governance_parameters.escrow_amount)
-        with sp.else_():
-            # Check that one of the DAO members executed the entry point
-            sp.verify(self.get_token_balance() > 0, message="DAO_NOT_MEMBER")
 
         # Add the new proposal information to the proposals big map
         self.data.proposals[self.data.counter] = sp.record(
@@ -599,7 +618,7 @@ class DAOGovernance(sp.Contract):
         sp.set_type(new_representatives, sp.TAddress)
 
         # Check that the DAO or the representatives executed the entry point
-        sp.verify((sp.sender == sp.self_address) |
+        sp.verify((sp.sender == sp.self_address) | 
                   (sp.sender == self.data.representatives),
                   message="DAO_NOT_DAO_OR_REPRESENTATIVES")
 
