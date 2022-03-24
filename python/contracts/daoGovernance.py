@@ -98,6 +98,19 @@ class DAOGovernance(sp.Contract):
         # approved and executed
         rejected=sp.TUnit)
 
+    VOTES_SUMMARY_TYPE = sp.TRecord(
+        # The number of positive votes that the proposal has received
+        positive=sp.TNat,
+        # The number of negative votes that the proposal has received
+        negative=sp.TNat,
+        # The number of abstain votes that the proposal has received
+        abstain=sp.TNat,
+        # The total number of votes that the proposal has received
+        total=sp.TNat,
+        # The total number of wallets that voted
+        participation=sp.TNat).layout(
+            ("positive", ("negative", ("abstain", ("total", "participation")))))
+
     PROPOSAL_TYPE = sp.TRecord(
         # The kind of proposal: text, transfer_mutez, transfer_token, etc
         kind=PROPOSAL_KIND_TYPE,
@@ -116,21 +129,10 @@ class DAOGovernance(sp.Contract):
         # The amount of DAO tokens in escrow
         escrow_amount=sp.TNat,
         # The proposal current status: open, approved, executed or rejected
-        status=PROPOSAL_STATUS_TYPE).layout(
-            ("kind", ("title", ("description", ("parameters", ("issuer", ("timestamp", ("level", ("escrow_amount", "status")))))))))
-
-    VOTES_SUMMARY_TYPE = sp.TRecord(
-        # The number of positive votes that the proposal has received
-        positive=sp.TNat,
-        # The number of negative votes that the proposal has received
-        negative=sp.TNat,
-        # The number of abstain votes that the proposal has received
-        abstain=sp.TNat,
-        # The total number of votes that the proposal has received
-        total=sp.TNat,
-        # The total number of wallets that voted
-        participation=sp.TNat).layout(
-            ("positive", ("negative", ("abstain", ("total", "participation")))))
+        status=PROPOSAL_STATUS_TYPE,
+        token_votes=VOTES_SUMMARY_TYPE,
+        representatives_votes=VOTES_SUMMARY_TYPE).layout(
+            ("kind", ("title", ("description", ("parameters", ("issuer", ("timestamp", ("level", ("escrow_amount", ("status", ("token_votes", "representatives_votes")))))))))))
 
     VOTE_KIND_TYPE = sp.TVariant(
         # A positive vote
@@ -183,11 +185,6 @@ class DAOGovernance(sp.Contract):
             governance_parameters=DAOGovernance.GOVERNANCE_PARAMETERS_TYPE,
             # The big map with the proposals information
             proposals=sp.TBigMap(sp.TNat, DAOGovernance.PROPOSAL_TYPE),
-            # The big map with the DAO token holders vote summaries
-            token_votes=sp.TBigMap(sp.TNat, DAOGovernance.VOTES_SUMMARY_TYPE),
-            # The big map with the community representatives vote summaries
-            representatives_votes=sp.TBigMap(
-                sp.TNat, DAOGovernance.VOTES_SUMMARY_TYPE),
             # The big map with all the votes information
             votes=sp.TBigMap(
                 sp.TPair(sp.TNat, sp.TAddress), DAOGovernance.VOTE_TYPE),
@@ -204,8 +201,6 @@ class DAOGovernance(sp.Contract):
             last_quorum_update=sp.now,
             governance_parameters=governance_parameters,
             proposals=sp.big_map(),
-            token_votes=sp.big_map(),
-            representatives_votes=sp.big_map(),
             votes=sp.big_map(),
             counter=0)
 
@@ -332,23 +327,19 @@ class DAOGovernance(sp.Contract):
             timestamp=sp.now,
             level=sp.level,
             escrow_amount=self.data.governance_parameters.escrow_amount,
-            status=sp.variant("open", sp.unit))
-
-        # Initialize DAO token holders vote counters for the new proposal
-        self.data.token_votes[self.data.counter] = sp.record(
-            positive=0,
-            negative=0,
-            abstain=0,
-            total=0,
-            participation=0)
-
-        # Initialize representatives vote counters for the new proposal
-        self.data.representatives_votes[self.data.counter] = sp.record(
-            positive=0,
-            negative=0,
-            abstain=0,
-            total=0,
-            participation=0)
+            status=sp.variant("open", sp.unit),
+            token_votes = sp.record(
+                positive=0,
+                negative=0,
+                abstain=0,
+                total=0,
+                participation=0),
+            representatives_votes = sp.record(
+                positive=0,
+                negative=0,
+                abstain=0,
+                total=0,
+                participation=0))
 
         # Increase the proposals counter
         self.data.counter += 1
@@ -396,7 +387,7 @@ class DAOGovernance(sp.Contract):
 
         # Update the DAO token holders vote summary
         new_votes = sp.local(
-            "new_votes", self.data.token_votes[params.proposal_id])
+            "new_votes", self.data.proposals[params.proposal_id].token_votes)
         new_votes.value.total += weight
         new_votes.value.participation += 1
 
@@ -408,7 +399,7 @@ class DAOGovernance(sp.Contract):
             with arg.match("abstain"):
                 new_votes.value.abstain += weight
 
-        self.data.token_votes[params.proposal_id] = new_votes.value
+        self.data.proposals[params.proposal_id].token_votes = new_votes.value
 
         # Add the vote to the votes big map
         self.data.votes[vote_key] = sp.record(vote=params.vote, weight=weight)
@@ -434,7 +425,8 @@ class DAOGovernance(sp.Contract):
                   message="DAO_INEXISTENT_PROPOSAL")
 
         # Check that the proposal voting period didn't expire
-        end_date = self.data.proposals[params.proposal_id].timestamp.add_days(
+        proposal = self.data.proposals[params.proposal_id]
+        end_date = proposal.timestamp.add_days(
             sp.to_int(self.data.governance_parameters.voting_period))
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
@@ -444,8 +436,7 @@ class DAOGovernance(sp.Contract):
                   message="DAO_ALREADY_VOTED")
 
         # Update the representatives vote summary
-        new_votes = sp.local(
-            "new_votes", self.data.representatives_votes[params.proposal_id])
+        new_votes = sp.local("new_votes", proposal.representatives_votes)
         new_votes.value.total += 1
         new_votes.value.participation += 1
 
@@ -457,7 +448,7 @@ class DAOGovernance(sp.Contract):
             with arg.match("abstain"):
                 new_votes.value.abstain += 1
 
-        self.data.representatives_votes[params.proposal_id] = new_votes.value
+        proposal.representatives_votes = new_votes.value
 
         # Add the vote to the votes big map
         self.data.votes[vote_key] = sp.record(vote=params.vote, weight=0)
@@ -488,8 +479,8 @@ class DAOGovernance(sp.Contract):
         sp.verify(sp.now > end_date, message="DAO_OPEN_PROPOSAL")
 
         # Get the votes summaries for the DAO token holders and representatives
-        token_votes = sp.compute(self.data.token_votes[proposal_id])
-        representatives_votes = sp.compute(self.data.representatives_votes[proposal_id])
+        token_votes = sp.compute(self.data.proposals[proposal_id].token_votes)
+        representatives_votes = sp.compute(self.data.proposals[proposal_id].representatives_votes)
 
         # Calculate the representatives votes based on the current quorum
         representatives_total = sp.compute(self.data.quorum * self.data.governance_parameters.representatives_share) // 100
