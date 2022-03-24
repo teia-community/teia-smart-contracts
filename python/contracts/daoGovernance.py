@@ -36,11 +36,15 @@ class DAOGovernance(sp.Contract):
         representatives_share=sp.TNat,
         # The minimum perion between quorum updates in days
         quorum_update_period=sp.TNat,
+        # The quorum update percentage
+        quorum_update=sp.TNat,
+        # The maximum quorum percentage change
+        quorum_max_change=sp.TNat,
         # The minimum possible quorum value
         min_quorum=sp.TNat,
         # The maximum possible quorum value
         max_quorum=sp.TNat).layout(
-            ("voting_period", ("escrow_amount", ("escrow_return", ("supermajority", ("representatives_share", ("quorum_update_period", ("min_quorum", "max_quorum"))))))))
+            ("voting_period", ("escrow_amount", ("escrow_return", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum"))))))))))
 
     PROPOSAL_KIND_TYPE = sp.TVariant(
         # A proposal in the form of text to be voted for
@@ -528,8 +532,23 @@ class DAOGovernance(sp.Contract):
 
         with sp.if_(sp.now > min_quorum_update_date):
             # Calculate the new quorum value
-            new_quorum = sp.local("new_quorum", (self.data.quorum * 80 + total * 20) // 100)
+            new_quorum = sp.local(
+                "new_quorum", (self.data.quorum * sp.as_nat(100 - self.data.governance_parameters.quorum_update) + 
+                               total * self.data.governance_parameters.quorum_update) // 100)
 
+            # Check that the quorum doesn't decrease or increase too fast
+            min_quorum = sp.compute(
+                (self.data.quorum * sp.as_nat(100 - self.data.governance_parameters.quorum_max_change)) // 100)
+            max_quorum = sp.compute(
+                (self.data.quorum * (100 + self.data.governance_parameters.quorum_max_change)) // 100)
+
+            with sp.if_(new_quorum.value < min_quorum):
+                new_quorum.value = min_quorum
+
+            with sp.if_(new_quorum.value > max_quorum):
+                new_quorum.value = max_quorum
+
+            # Check that the new quorum value stays within the limits
             with sp.if_(new_quorum.value < self.data.governance_parameters.min_quorum):
                 new_quorum.value = self.data.governance_parameters.min_quorum
 
@@ -707,5 +726,7 @@ sp.add_compilation_target("dao", DAOGovernance(
         supermajority=70,
         representatives_share=30,
         quorum_update_period=10,
+        quorum_update=20,
+        quorum_max_change=20,
         min_quorum=1000,
         max_quorum=100000)))

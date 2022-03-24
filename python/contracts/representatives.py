@@ -94,8 +94,10 @@ class Representatives(multisig.MultisigWallet):
         # Define the input parameter data type
         sp.set_type(new_dao, sp.TAddress)
 
-        # Check that the multisig itself executed the entry point
-        sp.verify(sp.sender == sp.self_address, message="MS_NOT_MULTISIG")
+        # Check that the DAO or the multisig executed the entry point
+        sp.verify((sp.sender == self.data.dao) | 
+                  (sp.sender == sp.self_address),
+                  message="MS_NOT_DAO_OR_MULTISIG")
 
         # Update the DAO contract address
         self.data.dao = new_dao
