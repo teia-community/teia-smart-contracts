@@ -174,34 +174,28 @@ def test_text_proposal():
     scenario.verify(dao.get_proposal_count() == 0)
 
     # Check that non-DAO members cannot create proposals
+
     proposal_kind = sp.variant("text", sp.unit)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.none,
-        lambda_function=sp.none)
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             valid=False, sender=external_user, now=sp.timestamp(100), exception="DAO_NOT_MEMBER")
 
     # Check that members with less tokens than the escrow cannot create proposals
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             valid=False, sender=user5, now=sp.timestamp(100), exception="FA2_INSUFFICIENT_BALANCE")
 
     # User 4 creates a proposal
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
@@ -244,7 +238,7 @@ def test_text_proposal():
     # Check that it's not possible to vote twice
     representatives.vote_dao_proposal(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
         valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
-    #dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+    # dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
     #    valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
 
     # User 2 votes as representative
@@ -359,20 +353,16 @@ def test_transfer_mutez_proposal():
     scenario += recipient2
 
     # User 4 creates a proposal
-    proposal_kind = sp.variant("transfer_mutez", sp.unit)
+    mutez_transfers = [
+        sp.record(amount=sp.tez(1), destination=recipient1.address),
+        sp.record(amount=sp.tez(2), destination=recipient2.address)]
+    proposal_kind = sp.variant("transfer_mutez", mutez_transfers)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.some([
-            sp.record(amount=sp.tez(1), destination=recipient1.address),
-            sp.record(amount=sp.tez(2), destination=recipient2.address)]),
-        token_transfers=sp.none,
-        lambda_function=sp.none)
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
@@ -444,25 +434,21 @@ def test_transfer_token_proposal():
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
-    proposal_kind = sp.variant("transfer_token", sp.unit)
+    token_transfers = sp.set_type_expr(
+        sp.record(
+            fa2=token.address,
+            token_id=sp.nat(0),
+            distribution=[
+                sp.record(amount=sp.nat(10), destination=user1.address),
+                sp.record(amount=sp.nat(20), destination=external_user.address)]),
+        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+    proposal_kind = sp.variant("transfer_token", token_transfers)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.set_type_expr(
-            sp.some(sp.record(
-                fa2=token.address,
-                token_id=sp.nat(0),
-                distribution=[
-                    sp.record(amount=sp.nat(10), destination=user1.address),
-                    sp.record(amount=sp.nat(20), destination=external_user.address)])),
-            t=sp.TOption(daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)),
-        lambda_function=sp.none)
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
@@ -543,18 +529,13 @@ def test_lambda_function_proposal():
             new_treasury.address, sp.mutez(0), set_treasury_handle)])
 
     # User 4 creates a proposal
-    proposal_kind = sp.variant("lambda_function", sp.unit)
+    proposal_kind = sp.variant("lambda_function", treasury_lambda_function)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.none,
-        lambda_function=sp.some(treasury_lambda_function))
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
@@ -628,18 +609,13 @@ def test_lambda_function_proposal():
             set_governance_parameters_handle)])
 
     # User 1 creates a proposal
-    proposal_kind = sp.variant("lambda_function", sp.unit)
+    proposal_kind = sp.variant("lambda_function", governance_parameters_lambda_function)
     proposal_title = sp.utils.bytes_of_string("Dummy title 2")
     proposal_description = sp.utils.bytes_of_string("Dummy description 2")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.none,
-        lambda_function=sp.some(governance_parameters_lambda_function))
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user1, level=50, now=sp.timestamp(500))
 
     # Check that the contract information has been updated
@@ -703,18 +679,13 @@ def test_lambda_function_proposal():
             new_representatives.address, sp.mutez(0), set_representatives_handle)])
 
     # User 2 creates a proposal
-    proposal_kind = sp.variant("lambda_function", sp.unit)
+    proposal_kind = sp.variant("lambda_function", representatives_lambda_function)
     proposal_title = sp.utils.bytes_of_string("Dummy title 3")
     proposal_description = sp.utils.bytes_of_string("Dummy description 3")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.none,
-        lambda_function=sp.some(representatives_lambda_function))
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user2, level=100, now=sp.timestamp(1000))
 
     # Check that the contract information has been updated
@@ -784,25 +755,21 @@ def test_supermajority_failed_proposal():
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
-    proposal_kind = sp.variant("transfer_token", sp.unit)
+    token_transfers = sp.set_type_expr(
+        sp.record(
+            fa2=token.address,
+            token_id=sp.nat(0),
+            distribution=[
+                sp.record(amount=sp.nat(10), destination=user1.address),
+                sp.record(amount=sp.nat(20), destination=external_user.address)]),
+        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+    proposal_kind = sp.variant("transfer_token", token_transfers)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.set_type_expr(
-            sp.some(sp.record(
-                fa2=token.address,
-                token_id=sp.nat(0),
-                distribution=[
-                    sp.record(amount=sp.nat(10), destination=user1.address),
-                    sp.record(amount=sp.nat(20), destination=external_user.address)])),
-            t=sp.TOption(daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)),
-        lambda_function=sp.none)
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the tokens in escrow have been transferred
@@ -857,25 +824,21 @@ def test_quorum_failed_proposal():
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
-    proposal_kind = sp.variant("transfer_token", sp.unit)
+    token_transfers = sp.set_type_expr(
+        sp.record(
+            fa2=token.address,
+            token_id=sp.nat(0),
+            distribution=[
+                sp.record(amount=sp.nat(10), destination=user1.address),
+                sp.record(amount=sp.nat(20), destination=external_user.address)]),
+        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+    proposal_kind = sp.variant("transfer_token", token_transfers)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
-    proposal_parameters = sp.record(
-        mutez_transfers=sp.none,
-        token_transfers=sp.set_type_expr(
-            sp.some(sp.record(
-                fa2=token.address,
-                token_id=sp.nat(0),
-                distribution=[
-                    sp.record(amount=sp.nat(10), destination=user1.address),
-                    sp.record(amount=sp.nat(20), destination=external_user.address)])),
-            t=sp.TOption(daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)),
-        lambda_function=sp.none)
     dao.create_proposal(
         kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description,
-        parameters=proposal_parameters).run(
+        description=proposal_description).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the tokens in escrow have been transferred

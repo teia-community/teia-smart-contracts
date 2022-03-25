@@ -46,16 +46,6 @@ class DAOGovernance(sp.Contract):
         max_quorum=sp.TNat).layout(
             ("voting_period", ("escrow_amount", ("escrow_return", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum"))))))))))
 
-    PROPOSAL_KIND_TYPE = sp.TVariant(
-        # A proposal in the form of text to be voted for
-        text=sp.TUnit,
-        # A proposal to transfer mutez from the DAO treasury to other accounts
-        transfer_mutez=sp.TUnit,
-        # A proposal to transfer a token from the DAO treasury to other accounts
-        transfer_token=sp.TUnit,
-        # A proposal to execute a lambda function
-        lambda_function=sp.TUnit)
-
     MUTEZ_TRANSFERS_TYPE = sp.TList(sp.TRecord(
         # The amount of mutez to transfer
         amount=sp.TMutez,
@@ -78,14 +68,15 @@ class DAOGovernance(sp.Contract):
 
     LAMBDA_FUNCTION_TYPE = sp.TLambda(sp.TUnit, sp.TList(sp.TOperation))
 
-    PROPOSAL_PARAMETERS_TYPE = sp.TRecord(
-        # The list of mutez transfers
-        mutez_transfers=sp.TOption(MUTEZ_TRANSFERS_TYPE),
-        # The list of token transfers
-        token_transfers=sp.TOption(TOKEN_TRANSFERS_TYPE),
-        # The lambda function to execute
-        lambda_function=sp.TOption(LAMBDA_FUNCTION_TYPE)).layout(
-            ("mutez_transfers", ("token_transfers", "lambda_function")))
+    PROPOSAL_KIND_TYPE = sp.TVariant(
+        # A proposal in the form of text to be voted for
+        text=sp.TUnit,
+        # A proposal to transfer mutez from the DAO treasury to other accounts
+        transfer_mutez=MUTEZ_TRANSFERS_TYPE,
+        # A proposal to transfer a token from the DAO treasury to other accounts
+        transfer_token=TOKEN_TRANSFERS_TYPE,
+        # A proposal to execute a lambda function
+        lambda_function=LAMBDA_FUNCTION_TYPE)
 
     PROPOSAL_STATUS_TYPE = sp.TVariant(
         # The status for proposals that are open and can still be voted
@@ -118,8 +109,6 @@ class DAOGovernance(sp.Contract):
         title=sp.TBytes,
         # The proposal description (normally a link to a file stored in IPFS)
         description=sp.TBytes,
-        # The proposal parameters
-        parameters=PROPOSAL_PARAMETERS_TYPE,
         # The DAO member that submitted the proposal
         issuer=sp.TAddress,
         # The timestamp when the proposal was submitted
@@ -134,7 +123,7 @@ class DAOGovernance(sp.Contract):
         token_votes=VOTES_SUMMARY_TYPE,
         # The proposal votes summary from the community representatives
         representatives_votes=VOTES_SUMMARY_TYPE).layout(
-            ("kind", ("title", ("description", ("parameters", ("issuer", ("timestamp", ("level", ("escrow_amount", ("status", ("token_votes", "representatives_votes")))))))))))
+            ("kind", ("title", ("description", ("issuer", ("timestamp", ("level", ("escrow_amount", ("status", ("token_votes", "representatives_votes"))))))))))
 
     VOTE_KIND_TYPE = sp.TVariant(
         # A positive vote
@@ -287,36 +276,8 @@ class DAOGovernance(sp.Contract):
         sp.set_type(params, sp.TRecord(
             kind=DAOGovernance.PROPOSAL_KIND_TYPE,
             title=sp.TBytes,
-            description=sp.TBytes,
-            parameters=DAOGovernance.PROPOSAL_PARAMETERS_TYPE).layout(
-                ("kind", ("title", ("description", "parameters")))))
-
-        # Check that the proposal contains the correct parameters
-        valid_parameters = sp.local("valid_parameters", False)
-
-        with params.kind.match_cases() as arg:
-            with arg.match("text"):
-                valid_parameters.value = (
-                    ~params.parameters.mutez_transfers.is_some() & 
-                    ~params.parameters.token_transfers.is_some() & 
-                    ~params.parameters.lambda_function.is_some())
-            with arg.match("transfer_mutez"):
-                valid_parameters.value = (
-                    params.parameters.mutez_transfers.is_some() & 
-                    ~params.parameters.token_transfers.is_some() & 
-                    ~params.parameters.lambda_function.is_some())
-            with arg.match("transfer_token"):
-                valid_parameters.value = (
-                    ~params.parameters.mutez_transfers.is_some() & 
-                    params.parameters.token_transfers.is_some() & 
-                    ~params.parameters.lambda_function.is_some())
-            with arg.match("lambda_function"):
-                valid_parameters.value = (
-                    ~params.parameters.mutez_transfers.is_some() & 
-                    ~params.parameters.token_transfers.is_some() & 
-                    params.parameters.lambda_function.is_some())
-
-        sp.verify(valid_parameters.value, message="DAO_WRONG_PARAMETERS")
+            description=sp.TBytes).layout(
+                ("kind", ("title", "description"))))
 
         # Check that one of the DAO members executed the entry point
         self.check_is_dao_member(self.data.token)
@@ -336,7 +297,6 @@ class DAOGovernance(sp.Contract):
             kind=params.kind,
             title=params.title,
             description=params.description,
-            parameters=params.parameters,
             issuer=sp.sender,
             timestamp=sp.now,
             level=sp.level,
@@ -583,36 +543,35 @@ class DAOGovernance(sp.Contract):
         self.data.proposals[proposal_id].status = sp.variant(
             "executed", sp.unit)
 
-        with sp.if_(proposal.kind.is_variant("transfer_mutez")):
-            # Get a handle to the DAO treasury transfer mutez entry point
-            transfer_mutez_handle = sp.contract(
-                t=DAOGovernance.MUTEZ_TRANSFERS_TYPE,
-                address=self.data.treasury,
-                entry_point="transfer_mutez").open_some()
+        with proposal.kind.match_cases() as arg:
+            with arg.match("transfer_mutez") as mutez_transfers:
+                # Get a handle to the DAO treasury transfer mutez entry point
+                transfer_mutez_handle = sp.contract(
+                    t=DAOGovernance.MUTEZ_TRANSFERS_TYPE,
+                    address=self.data.treasury,
+                    entry_point="transfer_mutez").open_some()
 
-            # Execute the tranfer
-            sp.transfer(
-                arg=proposal.parameters.mutez_transfers.open_some(),
-                amount=sp.mutez(0),
-                destination=transfer_mutez_handle)
+                # Execute the tranfer
+                sp.transfer(
+                    arg=mutez_transfers,
+                    amount=sp.mutez(0),
+                    destination=transfer_mutez_handle)
+            with arg.match("transfer_token") as token_transfers:
+                # Get a handle to the DAO treasury transfer token entry point
+                transfer_token_handle = sp.contract(
+                    t=DAOGovernance.TOKEN_TRANSFERS_TYPE,
+                    address=self.data.treasury,
+                    entry_point="transfer_token").open_some()
 
-        with sp.if_(proposal.kind.is_variant("transfer_token")):
-            # Get a handle to the DAO treasury transfer token entry point
-            transfer_token_handle = sp.contract(
-                t=DAOGovernance.TOKEN_TRANSFERS_TYPE,
-                address=self.data.treasury,
-                entry_point="transfer_token").open_some()
-
-            # Execute the tranfer
-            sp.transfer(
-                arg=proposal.parameters.token_transfers.open_some(),
-                amount=sp.mutez(0),
-                destination=transfer_token_handle)
-
-        with sp.if_(proposal.kind.is_variant("lambda_function")):
-            # Execute the lambda function
-            operations = proposal.parameters.lambda_function.open_some()(sp.unit)
-            sp.add_operations(operations)
+                # Execute the tranfer
+                sp.transfer(
+                    arg=token_transfers,
+                    amount=sp.mutez(0),
+                    destination=transfer_token_handle)
+            with arg.match("lambda_function") as lambda_function:
+                # Execute the lambda function
+                operations = lambda_function(sp.unit)
+                sp.add_operations(operations)
 
     @sp.entry_point
     def set_treasury(self, new_treasury):
