@@ -5,7 +5,7 @@ class DAOGovernance(sp.Contract):
     """This contract implements a Decentralized Autonomous Organization (DAO)
     governed by DAO token holders and community representatives.
 
-    The contract is a combination of the Teia multisig wallet contract that the
+    The contract is a combination of the Teia multisig wallet contract and the
     Murmuration DAO smart contracts:
       https://github.com/teia-community/teia-smart-contracts
       https://github.com/Hover-Labs/murmuration
@@ -116,7 +116,7 @@ class DAOGovernance(sp.Contract):
         kind=PROPOSAL_KIND_TYPE,
         # The proposal title
         title=sp.TBytes,
-        # The proposal description (normally an link to a file stored in IPFS)
+        # The proposal description (normally a link to a file stored in IPFS)
         description=sp.TBytes,
         # The proposal parameters
         parameters=PROPOSAL_PARAMETERS_TYPE,
@@ -130,7 +130,9 @@ class DAOGovernance(sp.Contract):
         escrow_amount=sp.TNat,
         # The proposal current status: open, approved, executed or rejected
         status=PROPOSAL_STATUS_TYPE,
+        # The proposal votes summary from the DAO token holders
         token_votes=VOTES_SUMMARY_TYPE,
+        # The proposal votes summary from the community representatives
         representatives_votes=VOTES_SUMMARY_TYPE).layout(
             ("kind", ("title", ("description", ("parameters", ("issuer", ("timestamp", ("level", ("escrow_amount", ("status", ("token_votes", "representatives_votes")))))))))))
 
@@ -145,7 +147,7 @@ class DAOGovernance(sp.Contract):
     VOTE_TYPE = sp.TRecord(
         # The user vote: yes, no or abstain
         vote=VOTE_KIND_TYPE,
-        # The vote weight based on the DAO token balance (0 for representatives)
+        # The vote weight based on the DAO token balance
         weight=sp.TNat).layout(
             ("vote", "weight"))
 
@@ -185,9 +187,12 @@ class DAOGovernance(sp.Contract):
             governance_parameters=DAOGovernance.GOVERNANCE_PARAMETERS_TYPE,
             # The big map with the proposals information
             proposals=sp.TBigMap(sp.TNat, DAOGovernance.PROPOSAL_TYPE),
-            # The big map with all the votes information
-            votes=sp.TBigMap(
+            # The big map with the DAO token holders votes information
+            token_votes=sp.TBigMap(
                 sp.TPair(sp.TNat, sp.TAddress), DAOGovernance.VOTE_TYPE),
+            # The big map with the community representatives votes information
+            representatives_votes=sp.TBigMap(
+                sp.TPair(sp.TNat, sp.TAddress), DAOGovernance.VOTE_KIND_TYPE),
             # The proposals counter
             counter=sp.TNat))
 
@@ -198,37 +203,44 @@ class DAOGovernance(sp.Contract):
             token=token,
             representatives=representatives,
             quorum=quorum,
-            last_quorum_update=sp.now,
+            last_quorum_update=sp.timestamp(0),
             governance_parameters=governance_parameters,
             proposals=sp.big_map(),
-            votes=sp.big_map(),
+            token_votes=sp.big_map(),
+            representatives_votes=sp.big_map(),
             counter=0)
 
-    def get_token_balance(self):
-        """Gets the sender token balance calling the DAO token on-chain view.
+    @sp.private_lambda(with_storage=None, wrap_call=True)
+    def check_is_dao_member(self, token):
+        """Checks that the address that called the entry point is from one of
+        the DAO members.
 
         """
-        param = sp.set_type_expr(
+        # Get the sender token balance
+        parameter = sp.set_type_expr(
             sp.record(
                 owner=sp.sender,
-                token_id=sp.nat(0)),
+                token_id=0),
             sp.TRecord(
                 owner=sp.TAddress,
                 token_id=sp.TNat).layout(
                     ("owner", "token_id")))
 
-        return sp.view(
+        token_balance = sp.view(
             name="get_balance",
-            address=self.data.token,
-            param=param,
+            address=token,
+            param=parameter,
             t=sp.TNat).open_some()
+
+        # Check that the token balance is not zero
+        sp.verify(token_balance > 0, message="DAO_NOT_MEMBER")
 
     def get_prior_token_balance(self, level, max_checkpoints):
         """Gets the sender prior token balance calling the DAO token on-chain
         view.
 
         """
-        param = sp.set_type_expr(
+        parameter = sp.set_type_expr(
             sp.record(
                 owner=sp.sender,
                 level=level,
@@ -242,7 +254,7 @@ class DAOGovernance(sp.Contract):
         return sp.view(
             name="get_prior_balance",
             address=self.data.token,
-            param=param,
+            param=parameter,
             t=sp.TNat).open_some()
 
     def transfer_tokens(self, from_, to_, amount):
@@ -307,15 +319,17 @@ class DAOGovernance(sp.Contract):
         sp.verify(valid_parameters.value, message="DAO_WRONG_PARAMETERS")
 
         # Check that one of the DAO members executed the entry point
-        sp.verify(self.get_token_balance() > 0, message="DAO_NOT_MEMBER")
+        self.check_is_dao_member(self.data.token)
 
         # Check if it's necessary to escrow DAO tokens to create proposals
-        with sp.if_(self.data.governance_parameters.escrow_amount > 0):
+        escrow_amount = sp.compute(self.data.governance_parameters.escrow_amount)
+
+        with sp.if_(escrow_amount > 0):
             # Transfer the DAO tokens from the sender to the DAO contract
             self.transfer_tokens(
                 from_=sp.sender,
                 to_=sp.self_address,
-                amount=self.data.governance_parameters.escrow_amount)
+                amount=escrow_amount)
 
         # Add the new proposal information to the proposals big map
         self.data.proposals[self.data.counter] = sp.record(
@@ -326,15 +340,15 @@ class DAOGovernance(sp.Contract):
             issuer=sp.sender,
             timestamp=sp.now,
             level=sp.level,
-            escrow_amount=self.data.governance_parameters.escrow_amount,
+            escrow_amount=escrow_amount,
             status=sp.variant("open", sp.unit),
-            token_votes = sp.record(
+            token_votes=sp.record(
                 positive=0,
                 negative=0,
                 abstain=0,
                 total=0,
                 participation=0),
-            representatives_votes = sp.record(
+            representatives_votes=sp.record(
                 positive=0,
                 negative=0,
                 abstain=0,
@@ -368,7 +382,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the member didn't vote the proposal before
         vote_key = sp.pair(params.proposal_id, sp.sender)
-        sp.verify(~self.data.votes.contains(vote_key),
+        sp.verify(~self.data.token_votes.contains(vote_key),
                   message="DAO_ALREADY_VOTED")
 
         # Get the member DAO token balance at the proposal creation
@@ -386,8 +400,7 @@ class DAOGovernance(sp.Contract):
         weight = token_balance.value
 
         # Update the DAO token holders vote summary
-        new_votes = sp.local(
-            "new_votes", self.data.proposals[params.proposal_id].token_votes)
+        new_votes = sp.local("new_votes", proposal.token_votes)
         new_votes.value.total += weight
         new_votes.value.participation += 1
 
@@ -401,8 +414,8 @@ class DAOGovernance(sp.Contract):
 
         self.data.proposals[params.proposal_id].token_votes = new_votes.value
 
-        # Add the vote to the votes big map
-        self.data.votes[vote_key] = sp.record(vote=params.vote, weight=weight)
+        # Add the vote to the token votes big map
+        self.data.token_votes[vote_key] = sp.record(vote=params.vote, weight=weight)
 
     @sp.entry_point
     def representatives_vote(self, params):
@@ -425,14 +438,14 @@ class DAOGovernance(sp.Contract):
                   message="DAO_INEXISTENT_PROPOSAL")
 
         # Check that the proposal voting period didn't expire
-        proposal = self.data.proposals[params.proposal_id]
+        proposal = sp.compute(self.data.proposals[params.proposal_id])
         end_date = proposal.timestamp.add_days(
             sp.to_int(self.data.governance_parameters.voting_period))
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
         # Check that the representative didn't vote the proposal before
         vote_key = sp.pair(params.proposal_id, params.representative)
-        sp.verify(~self.data.votes.contains(vote_key),
+        sp.verify(~self.data.representatives_votes.contains(vote_key),
                   message="DAO_ALREADY_VOTED")
 
         # Update the representatives vote summary
@@ -448,10 +461,10 @@ class DAOGovernance(sp.Contract):
             with arg.match("abstain"):
                 new_votes.value.abstain += 1
 
-        proposal.representatives_votes = new_votes.value
+        self.data.proposals[params.proposal_id].representatives_votes = new_votes.value
 
-        # Add the vote to the votes big map
-        self.data.votes[vote_key] = sp.record(vote=params.vote, weight=0)
+        # Add the vote to the representatives votes big map
+        self.data.representatives_votes[vote_key] = params.vote
 
     @sp.entry_point
     def evaluate_voting_result(self, proposal_id):
@@ -462,7 +475,7 @@ class DAOGovernance(sp.Contract):
         sp.set_type(proposal_id, sp.TNat)
 
         # Check that one of the DAO members executed the entry point
-        sp.verify(self.get_token_balance() > 0, message="DAO_NOT_MEMBER")
+        self.check_is_dao_member(self.data.token)
 
         # Check that the proposal exists
         sp.verify(proposal_id < self.data.counter,
@@ -478,19 +491,15 @@ class DAOGovernance(sp.Contract):
             sp.to_int(self.data.governance_parameters.voting_period))
         sp.verify(sp.now > end_date, message="DAO_OPEN_PROPOSAL")
 
-        # Get the votes summaries for the DAO token holders and representatives
-        token_votes = sp.compute(self.data.proposals[proposal_id].token_votes)
-        representatives_votes = sp.compute(self.data.proposals[proposal_id].representatives_votes)
-
         # Calculate the representatives votes based on the current quorum
         representatives_total = sp.compute(self.data.quorum * self.data.governance_parameters.representatives_share) // 100
-        representatives_positive = (representatives_total * representatives_votes.positive) // representatives_votes.total
-        representatives_negative = (representatives_total * representatives_votes.negative) // representatives_votes.total
+        representatives_positive = (representatives_total * proposal.representatives_votes.positive) // proposal.representatives_votes.total
+        representatives_negative = (representatives_total * proposal.representatives_votes.negative) // proposal.representatives_votes.total
 
         # Count the total votes
-        total = token_votes.total + representatives_total
-        positive = sp.compute(token_votes.positive + representatives_positive)
-        negative = sp.compute(token_votes.negative + representatives_negative)
+        total = proposal.token_votes.total + representatives_total
+        positive = sp.compute(proposal.token_votes.positive + representatives_positive)
+        negative = sp.compute(proposal.token_votes.negative + representatives_negative)
 
         # Check if there are some DAO tokens in escrow
         with sp.if_(proposal.escrow_amount > 0):
@@ -559,7 +568,7 @@ class DAOGovernance(sp.Contract):
         sp.set_type(proposal_id, sp.TNat)
 
         # Check that one of the DAO members executed the entry point
-        sp.verify(self.get_token_balance() > 0, message="DAO_NOT_MEMBER")
+        self.check_is_dao_member(self.data.token)
 
         # Check that the proposal exists
         sp.verify(proposal_id < self.data.counter,
@@ -684,11 +693,29 @@ class DAOGovernance(sp.Contract):
 
         # Check that the vote is present in the votes big map
         vote_key = sp.pair(params.proposal_id, params.member)
-        sp.verify(self.data.votes.contains(vote_key),
+        sp.verify(self.data.token_votes.contains(vote_key),
                   message="DAO_NO_MEMBER_VOTE")
 
         # Return the member's vote
-        sp.result(self.data.votes[vote_key])
+        sp.result(self.data.token_votes[vote_key])
+
+    @sp.onchain_view()
+    def get_representative_vote(self, params):
+        """Returns a community representative's vote.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(params, sp.TRecord(
+            proposal_id=sp.TNat,
+            member=sp.TAddress).layout(("proposal_id", "member")))
+
+        # Check that the vote is present in the votes big map
+        vote_key = sp.pair(params.proposal_id, params.member)
+        sp.verify(self.data.representatives_votes.contains(vote_key),
+                  message="DAO_NO_MEMBER_VOTE")
+
+        # Return the member's vote
+        sp.result(self.data.representatives_votes[vote_key])
 
     @sp.onchain_view()
     def has_voted(self, params):
@@ -701,7 +728,7 @@ class DAOGovernance(sp.Contract):
             member=sp.TAddress).layout(("proposal_id", "member")))
 
         # Return true if the member has voted the proposal
-        sp.result(self.data.votes.contains((params.proposal_id, params.member)))
+        sp.result(self.data.token_votes.contains((params.proposal_id, params.member)))
 
 
 sp.add_compilation_target("dao", DAOGovernance(

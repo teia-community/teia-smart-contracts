@@ -239,14 +239,13 @@ def test_text_proposal():
     scenario.verify(dao.get_proposal(0).representatives_votes.negative == 0)
     scenario.verify(dao.get_proposal(0).representatives_votes.abstain == 1)
     scenario.verify(dao.get_proposal(0).representatives_votes.participation == 1)
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user1.address)).vote.is_variant("abstain"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user1.address)).weight == 0)
+    scenario.verify(dao.get_representative_vote(sp.record(proposal_id=0, member=user1.address)).is_variant("abstain"))
 
     # Check that it's not possible to vote twice
     representatives.vote_dao_proposal(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
         valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
-    dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
-        valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
+    #dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+    #    valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
 
     # User 2 votes as representative
     representatives.vote_dao_proposal(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
@@ -275,10 +274,8 @@ def test_text_proposal():
     scenario.verify(dao.get_proposal(0).token_votes.negative == 5)
     scenario.verify(dao.get_proposal(0).token_votes.abstain == 0)
     scenario.verify(dao.get_proposal(0).token_votes.participation == 3)
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user1.address)).vote.is_variant("abstain"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user1.address)).weight == 0)
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user2.address)).vote.is_variant("yes"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user2.address)).weight == 0)
+    scenario.verify(dao.get_representative_vote(sp.record(proposal_id=0, member=user1.address)).is_variant("abstain"))
+    scenario.verify(dao.get_representative_vote(sp.record(proposal_id=0, member=user2.address)).is_variant("yes"))
     scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user3.address)).vote.is_variant("yes"))
     scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user3.address)).weight == 300)
     scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user4.address)).vote.is_variant("yes"))
