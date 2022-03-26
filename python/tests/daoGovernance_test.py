@@ -738,6 +738,80 @@ def test_lambda_function_proposal():
     scenario.verify(dao.data.representatives == new_representatives.address)
 
 
+@sp.add_test(name="Test cancel proposal")
+def test_cancel_proposal():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    user1 = testEnvironment["user1"]
+    user2 = testEnvironment["user2"]
+    user3 = testEnvironment["user3"]
+    user4 = testEnvironment["user4"]
+    user5 = testEnvironment["user5"]
+    external_user = testEnvironment["external_user"]
+    token = testEnvironment["token"]
+    treasury = testEnvironment["treasury"]
+    representatives = testEnvironment["representatives"]
+    dao = testEnvironment["dao"]
+
+    # User 4 creates a proposal
+    proposal_title = sp.utils.bytes_of_string("Dummy title")
+    proposal_description = sp.utils.bytes_of_string("Dummy description")
+    token_transfers = sp.set_type_expr(
+        sp.record(
+            fa2=token.address,
+            token_id=sp.nat(0),
+            distribution=[
+                sp.record(amount=sp.nat(10), destination=user1.address),
+                sp.record(amount=sp.nat(20), destination=external_user.address)]),
+        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+    proposal_kind = sp.variant("transfer_token", token_transfers)
+    dao.create_proposal(
+        title=proposal_title,
+        description=proposal_description,
+        kind=proposal_kind).run(
+            sender=user4, level=10, now=sp.timestamp(100))
+
+    # Check that the tokens in escrow have been transferred
+    scenario.verify(token.data.ledger[user4.address] == 400 - 10)
+    scenario.verify(token.data.ledger[dao.address] == 10)
+
+    # User 3, 4 and 5 vote as normal users
+    dao.token_vote(proposal_id=0, vote=sp.variant("no", sp.unit), max_checkpoints=sp.none).run(
+        sender=user3, now=sp.timestamp(400), level=40)
+    dao.token_vote(proposal_id=0, vote=sp.variant("no", sp.unit), max_checkpoints=sp.none).run(
+        sender=user4, now=sp.timestamp(400), level=40)
+    dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+        sender=user5, now=sp.timestamp(400), level=40)
+
+    # Check that it's not possible to cancel an innexisting proposal
+    dao.cancel_proposal(1).run(
+        valid=False, sender=user4, now=sp.timestamp(500), level=50, exception="DAO_INEXISTENT_PROPOSAL")
+
+    # Check that only the proposal issuer can cancel the proposal
+    dao.cancel_proposal(0).run(
+        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER")
+
+    # Cancel the proposal
+    dao.cancel_proposal(0).run(sender=user4, now=sp.timestamp(500), level=50)
+
+    # Check that the contract information has been updated
+    scenario.verify(dao.data.proposals[0].status.is_variant("cancelled"))
+
+    # Check that the tokens in escrow have been transferred to the treasury
+    scenario.verify(token.data.ledger[user4.address] == 400 - 10)
+    scenario.verify(token.data.ledger[dao.address] == 0)
+    scenario.verify(token.data.ledger[treasury.address] == 990 + 10)
+
+    # Check that it's not possible to cancel, evaluate or execute the proposal
+    dao.cancel_proposal(0).run(
+        valid=False, sender=user4, now=sp.timestamp(600), level=60, exception="DAO_STATUS_NOT_OPEN_OR_APPROVED")
+    dao.evaluate_voting_result(0).run(
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5), level=60, exception="DAO_STATUS_NOT_OPEN")
+    dao.execute_proposal(0).run(
+        valid=False, sender=user1, exception="DAO_STATUS_NOT_APPROVED")
+
+
 @sp.add_test(name="Test supermajority failed proposal")
 def test_supermajority_failed_proposal():
     # Get the test environment
