@@ -171,43 +171,43 @@ def test_text_proposal():
     scenario.verify(dao.data.representatives == representatives.address)
     scenario.verify(dao.data.quorum == 800)
     scenario.verify(dao.data.last_quorum_update == sp.timestamp(0))
-    scenario.verify(dao.get_proposal_count() == 0)
+    scenario.verify(dao.data.counter == 0)
 
     # Check that non-DAO members cannot create proposals
 
-    proposal_kind = sp.variant("text", sp.unit)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
+    proposal_kind = sp.variant("text", sp.unit)
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             valid=False, sender=external_user, now=sp.timestamp(100), exception="DAO_NOT_MEMBER")
 
     # Check that members with less tokens than the escrow cannot create proposals
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             valid=False, sender=user5, now=sp.timestamp(100), exception="FA2_INSUFFICIENT_BALANCE")
 
     # User 4 creates a proposal
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).kind.is_variant("text"))
-    scenario.verify(dao.get_proposal(0).title == proposal_title)
-    scenario.verify(dao.get_proposal(0).description == proposal_description)
-    scenario.verify(dao.get_proposal(0).issuer == user4.address)
-    scenario.verify(dao.get_proposal(0).timestamp == sp.timestamp(100))
-    scenario.verify(dao.get_proposal(0).level == 10)
-    scenario.verify(dao.get_proposal(0).escrow_amount == 10)
-    scenario.verify(dao.get_proposal(0).status.is_variant("open"))
-    scenario.verify(dao.get_proposal_count() == 1)
+    scenario.verify(dao.data.proposals[0].title == proposal_title)
+    scenario.verify(dao.data.proposals[0].description == proposal_description)
+    scenario.verify(dao.data.proposals[0].kind.is_variant("text"))
+    scenario.verify(dao.data.proposals[0].issuer == user4.address)
+    scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
+    scenario.verify(dao.data.proposals[0].level == 10)
+    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
     scenario.verify(token.data.ledger[user4.address] == 400 - 10)
@@ -228,12 +228,12 @@ def test_text_proposal():
         sender=user1, now=sp.timestamp(200), level=20)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).representatives_votes.total == 1)
-    scenario.verify(dao.get_proposal(0).representatives_votes.positive == 0)
-    scenario.verify(dao.get_proposal(0).representatives_votes.negative == 0)
-    scenario.verify(dao.get_proposal(0).representatives_votes.abstain == 1)
-    scenario.verify(dao.get_proposal(0).representatives_votes.participation == 1)
-    scenario.verify(dao.get_representative_vote(sp.record(proposal_id=0, member=user1.address)).is_variant("abstain"))
+    scenario.verify(dao.data.proposals[0].representatives_votes.total == 1)
+    scenario.verify(dao.data.proposals[0].representatives_votes.positive == 0)
+    scenario.verify(dao.data.proposals[0].representatives_votes.negative == 0)
+    scenario.verify(dao.data.proposals[0].representatives_votes.abstain == 1)
+    scenario.verify(dao.data.proposals[0].representatives_votes.participation == 1)
+    scenario.verify(dao.data.representatives_votes[(0, user1.address)].is_variant("abstain"))
 
     # Check that it's not possible to vote twice
     representatives.vote_dao_proposal(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
@@ -258,24 +258,24 @@ def test_text_proposal():
         sender=user5, now=sp.timestamp(400), level=40)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).representatives_votes.total == 2)
-    scenario.verify(dao.get_proposal(0).representatives_votes.positive == 1)
-    scenario.verify(dao.get_proposal(0).representatives_votes.negative == 0)
-    scenario.verify(dao.get_proposal(0).representatives_votes.abstain == 1)
-    scenario.verify(dao.get_proposal(0).representatives_votes.participation == 2)
-    scenario.verify(dao.get_proposal(0).token_votes.total == 300 + 400 + 5)
-    scenario.verify(dao.get_proposal(0).token_votes.positive == 300 + 400)
-    scenario.verify(dao.get_proposal(0).token_votes.negative == 5)
-    scenario.verify(dao.get_proposal(0).token_votes.abstain == 0)
-    scenario.verify(dao.get_proposal(0).token_votes.participation == 3)
-    scenario.verify(dao.get_representative_vote(sp.record(proposal_id=0, member=user1.address)).is_variant("abstain"))
-    scenario.verify(dao.get_representative_vote(sp.record(proposal_id=0, member=user2.address)).is_variant("yes"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user3.address)).vote.is_variant("yes"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user3.address)).weight == 300)
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user4.address)).vote.is_variant("yes"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user4.address)).weight == 400)
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user5.address)).vote.is_variant("no"))
-    scenario.verify(dao.get_vote(sp.record(proposal_id=0, member=user5.address)).weight == 5)
+    scenario.verify(dao.data.proposals[0].representatives_votes.total == 2)
+    scenario.verify(dao.data.proposals[0].representatives_votes.positive == 1)
+    scenario.verify(dao.data.proposals[0].representatives_votes.negative == 0)
+    scenario.verify(dao.data.proposals[0].representatives_votes.abstain == 1)
+    scenario.verify(dao.data.proposals[0].representatives_votes.participation == 2)
+    scenario.verify(dao.data.proposals[0].token_votes.total == 300 + 400 + 5)
+    scenario.verify(dao.data.proposals[0].token_votes.positive == 300 + 400)
+    scenario.verify(dao.data.proposals[0].token_votes.negative == 5)
+    scenario.verify(dao.data.proposals[0].token_votes.abstain == 0)
+    scenario.verify(dao.data.proposals[0].token_votes.participation == 3)
+    scenario.verify(dao.data.representatives_votes[(0, user1.address)].is_variant("abstain"))
+    scenario.verify(dao.data.representatives_votes[(0, user2.address)].is_variant("yes"))
+    scenario.verify(dao.data.token_votes[(0, user3.address)].vote.is_variant("yes"))
+    scenario.verify(dao.data.token_votes[(0, user3.address)].weight == 300)
+    scenario.verify(dao.data.token_votes[(0, user4.address)].vote.is_variant("yes"))
+    scenario.verify(dao.data.token_votes[(0, user4.address)].weight == 400)
+    scenario.verify(dao.data.token_votes[(0, user5.address)].vote.is_variant("no"))
+    scenario.verify(dao.data.token_votes[(0, user5.address)].weight == 5)
 
     # Check that it's not possible to evaluate the proposal results before is closed
     dao.evaluate_voting_result(0).run(
@@ -308,7 +308,7 @@ def test_text_proposal():
         sender=user1, now=sp.timestamp(101).add_days(5), level=60)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("approved"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("approved"))
     scenario.verify(dao.data.quorum == int(800 * 0.8 + (300 + 400 + 5 + 800 * 0.3) * 0.2))
     scenario.verify(dao.data.last_quorum_update == sp.timestamp(101).add_days(5))
 
@@ -324,7 +324,7 @@ def test_text_proposal():
     dao.execute_proposal(0).run(sender=user1)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("executed"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
 
     # Check that it's not possible to execute twice the proposal
     dao.execute_proposal(0).run(
@@ -353,28 +353,28 @@ def test_transfer_mutez_proposal():
     scenario += recipient2
 
     # User 4 creates a proposal
+    proposal_title = sp.utils.bytes_of_string("Dummy title")
+    proposal_description = sp.utils.bytes_of_string("Dummy description")
     mutez_transfers = [
         sp.record(amount=sp.tez(1), destination=recipient1.address),
         sp.record(amount=sp.tez(2), destination=recipient2.address)]
     proposal_kind = sp.variant("transfer_mutez", mutez_transfers)
-    proposal_title = sp.utils.bytes_of_string("Dummy title")
-    proposal_description = sp.utils.bytes_of_string("Dummy description")
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).kind.is_variant("transfer_mutez"))
-    scenario.verify(dao.get_proposal(0).title == proposal_title)
-    scenario.verify(dao.get_proposal(0).description == proposal_description)
-    scenario.verify(dao.get_proposal(0).issuer == user4.address)
-    scenario.verify(dao.get_proposal(0).timestamp == sp.timestamp(100))
-    scenario.verify(dao.get_proposal(0).level == 10)
-    scenario.verify(dao.get_proposal(0).escrow_amount == 10)
-    scenario.verify(dao.get_proposal(0).status.is_variant("open"))
-    scenario.verify(dao.get_proposal_count() == 1)
+    scenario.verify(dao.data.proposals[0].title == proposal_title)
+    scenario.verify(dao.data.proposals[0].description == proposal_description)
+    scenario.verify(dao.data.proposals[0].kind.is_variant("transfer_mutez"))
+    scenario.verify(dao.data.proposals[0].issuer == user4.address)
+    scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
+    scenario.verify(dao.data.proposals[0].level == 10)
+    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
     scenario.verify(token.data.ledger[user4.address] == 400 - 10)
@@ -399,7 +399,7 @@ def test_transfer_mutez_proposal():
         sender=user1, now=sp.timestamp(101).add_days(5), level=60)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("approved"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("approved"))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user4.address] == 400)
@@ -409,7 +409,7 @@ def test_transfer_mutez_proposal():
     dao.execute_proposal(0).run(sender=user1)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("executed"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
 
     # Check that the tez have been transferred
     scenario.verify(treasury.balance == sp.tez(10) - sp.tez(1) - sp.tez(2))
@@ -434,6 +434,8 @@ def test_transfer_token_proposal():
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
+    proposal_title = sp.utils.bytes_of_string("Dummy title")
+    proposal_description = sp.utils.bytes_of_string("Dummy description")
     token_transfers = sp.set_type_expr(
         sp.record(
             fa2=token.address,
@@ -443,24 +445,22 @@ def test_transfer_token_proposal():
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
         t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
-    proposal_title = sp.utils.bytes_of_string("Dummy title")
-    proposal_description = sp.utils.bytes_of_string("Dummy description")
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).kind.is_variant("transfer_token"))
-    scenario.verify(dao.get_proposal(0).title == proposal_title)
-    scenario.verify(dao.get_proposal(0).description == proposal_description)
-    scenario.verify(dao.get_proposal(0).issuer == user4.address)
-    scenario.verify(dao.get_proposal(0).timestamp == sp.timestamp(100))
-    scenario.verify(dao.get_proposal(0).level == 10)
-    scenario.verify(dao.get_proposal(0).escrow_amount == 10)
-    scenario.verify(dao.get_proposal(0).status.is_variant("open"))
-    scenario.verify(dao.get_proposal_count() == 1)
+    scenario.verify(dao.data.proposals[0].title == proposal_title)
+    scenario.verify(dao.data.proposals[0].description == proposal_description)
+    scenario.verify(dao.data.proposals[0].kind.is_variant("transfer_token"))
+    scenario.verify(dao.data.proposals[0].issuer == user4.address)
+    scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
+    scenario.verify(dao.data.proposals[0].level == 10)
+    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
     scenario.verify(token.data.ledger[user4.address] == 400 - 10)
@@ -485,7 +485,7 @@ def test_transfer_token_proposal():
         sender=user1, now=sp.timestamp(101).add_days(5), level=60)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("approved"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("approved"))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user4.address] == 400)
@@ -495,7 +495,7 @@ def test_transfer_token_proposal():
     dao.execute_proposal(0).run(sender=user1)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("executed"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
 
     # Check that the tokens have been transferred
     scenario.verify(token.data.ledger[treasury.address] == 990 - 10 - 20)
@@ -529,25 +529,25 @@ def test_lambda_function_proposal():
             new_treasury.address, sp.mutez(0), set_treasury_handle)])
 
     # User 4 creates a proposal
-    proposal_kind = sp.variant("lambda_function", treasury_lambda_function)
     proposal_title = sp.utils.bytes_of_string("Dummy title")
     proposal_description = sp.utils.bytes_of_string("Dummy description")
+    proposal_kind = sp.variant("lambda_function", treasury_lambda_function)
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).kind.is_variant("lambda_function"))
-    scenario.verify(dao.get_proposal(0).title == proposal_title)
-    scenario.verify(dao.get_proposal(0).description == proposal_description)
-    scenario.verify(dao.get_proposal(0).issuer == user4.address)
-    scenario.verify(dao.get_proposal(0).timestamp == sp.timestamp(100))
-    scenario.verify(dao.get_proposal(0).level == 10)
-    scenario.verify(dao.get_proposal(0).escrow_amount == 10)
-    scenario.verify(dao.get_proposal(0).status.is_variant("open"))
-    scenario.verify(dao.get_proposal_count() == 1)
+    scenario.verify(dao.data.proposals[0].title == proposal_title)
+    scenario.verify(dao.data.proposals[0].description == proposal_description)
+    scenario.verify(dao.data.proposals[0].kind.is_variant("lambda_function"))
+    scenario.verify(dao.data.proposals[0].issuer == user4.address)
+    scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
+    scenario.verify(dao.data.proposals[0].level == 10)
+    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
     scenario.verify(token.data.ledger[user4.address] == 400 - 10)
@@ -572,7 +572,7 @@ def test_lambda_function_proposal():
         sender=user1, now=sp.timestamp(101).add_days(5), level=60)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("approved"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("approved"))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user4.address] == 400)
@@ -582,7 +582,7 @@ def test_lambda_function_proposal():
     dao.execute_proposal(0).run(sender=user1)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("executed"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
 
     # Check that the treasury address has been updated
     scenario.verify(dao.data.treasury == new_treasury.address)
@@ -609,25 +609,25 @@ def test_lambda_function_proposal():
             set_governance_parameters_handle)])
 
     # User 1 creates a proposal
-    proposal_kind = sp.variant("lambda_function", governance_parameters_lambda_function)
     proposal_title = sp.utils.bytes_of_string("Dummy title 2")
     proposal_description = sp.utils.bytes_of_string("Dummy description 2")
+    proposal_kind = sp.variant("lambda_function", governance_parameters_lambda_function)
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user1, level=50, now=sp.timestamp(500))
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(1).kind.is_variant("lambda_function"))
-    scenario.verify(dao.get_proposal(1).title == proposal_title)
-    scenario.verify(dao.get_proposal(1).description == proposal_description)
-    scenario.verify(dao.get_proposal(1).issuer == user1.address)
-    scenario.verify(dao.get_proposal(1).timestamp == sp.timestamp(500))
-    scenario.verify(dao.get_proposal(1).level == 50)
-    scenario.verify(dao.get_proposal(1).escrow_amount == 10)
-    scenario.verify(dao.get_proposal(1).status.is_variant("open"))
-    scenario.verify(dao.get_proposal_count() == 2)
+    scenario.verify(dao.data.proposals[1].title == proposal_title)
+    scenario.verify(dao.data.proposals[1].description == proposal_description)
+    scenario.verify(dao.data.proposals[1].kind.is_variant("lambda_function"))
+    scenario.verify(dao.data.proposals[1].issuer == user1.address)
+    scenario.verify(dao.data.proposals[1].timestamp == sp.timestamp(500))
+    scenario.verify(dao.data.proposals[1].level == 50)
+    scenario.verify(dao.data.proposals[1].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[1].status.is_variant("open"))
+    scenario.verify(dao.data.counter == 2)
 
     # Check that the tokens in escrow have been transferred
     scenario.verify(token.data.ledger[user1.address] == 100 - 10)
@@ -652,7 +652,7 @@ def test_lambda_function_proposal():
         sender=user1, now=sp.timestamp(501).add_days(5), level=110)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(1).status.is_variant("approved"))
+    scenario.verify(dao.data.proposals[1].status.is_variant("approved"))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user1.address] == 100)
@@ -662,7 +662,7 @@ def test_lambda_function_proposal():
     dao.execute_proposal(1).run(sender=user1)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(1).status.is_variant("executed"))
+    scenario.verify(dao.data.proposals[1].status.is_variant("executed"))
 
     # Check that the DAO governance parameters has been updated
     scenario.verify(dao.data.governance_parameters.escrow_amount == 20)
@@ -679,25 +679,25 @@ def test_lambda_function_proposal():
             new_representatives.address, sp.mutez(0), set_representatives_handle)])
 
     # User 2 creates a proposal
-    proposal_kind = sp.variant("lambda_function", representatives_lambda_function)
     proposal_title = sp.utils.bytes_of_string("Dummy title 3")
     proposal_description = sp.utils.bytes_of_string("Dummy description 3")
+    proposal_kind = sp.variant("lambda_function", representatives_lambda_function)
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user2, level=100, now=sp.timestamp(1000))
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(2).kind.is_variant("lambda_function"))
-    scenario.verify(dao.get_proposal(2).title == proposal_title)
-    scenario.verify(dao.get_proposal(2).description == proposal_description)
-    scenario.verify(dao.get_proposal(2).issuer == user2.address)
-    scenario.verify(dao.get_proposal(2).timestamp == sp.timestamp(1000))
-    scenario.verify(dao.get_proposal(2).level == 100)
-    scenario.verify(dao.get_proposal(2).escrow_amount == 20)
-    scenario.verify(dao.get_proposal(2).status.is_variant("open"))
-    scenario.verify(dao.get_proposal_count() == 3)
+    scenario.verify(dao.data.proposals[2].title == proposal_title)
+    scenario.verify(dao.data.proposals[2].description == proposal_description)
+    scenario.verify(dao.data.proposals[2].kind.is_variant("lambda_function"))
+    scenario.verify(dao.data.proposals[2].issuer == user2.address)
+    scenario.verify(dao.data.proposals[2].timestamp == sp.timestamp(1000))
+    scenario.verify(dao.data.proposals[2].level == 100)
+    scenario.verify(dao.data.proposals[2].escrow_amount == 20)
+    scenario.verify(dao.data.proposals[2].status.is_variant("open"))
+    scenario.verify(dao.data.counter == 3)
 
     # Check that the tokens in escrow have been transferred
     scenario.verify(token.data.ledger[user2.address] == 200 - 20)
@@ -722,7 +722,7 @@ def test_lambda_function_proposal():
         sender=user1, now=sp.timestamp(1001).add_days(5), level=210)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(2).status.is_variant("approved"))
+    scenario.verify(dao.data.proposals[2].status.is_variant("approved"))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user2.address] == 200)
@@ -732,7 +732,7 @@ def test_lambda_function_proposal():
     dao.execute_proposal(2).run(sender=user1)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(2).status.is_variant("executed"))
+    scenario.verify(dao.data.proposals[2].status.is_variant("executed"))
 
     # Check that the representatives address has been updated
     scenario.verify(dao.data.representatives == new_representatives.address)
@@ -755,6 +755,8 @@ def test_supermajority_failed_proposal():
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
+    proposal_title = sp.utils.bytes_of_string("Dummy title")
+    proposal_description = sp.utils.bytes_of_string("Dummy description")
     token_transfers = sp.set_type_expr(
         sp.record(
             fa2=token.address,
@@ -764,12 +766,10 @@ def test_supermajority_failed_proposal():
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
         t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
-    proposal_title = sp.utils.bytes_of_string("Dummy title")
-    proposal_description = sp.utils.bytes_of_string("Dummy description")
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the tokens in escrow have been transferred
@@ -795,7 +795,7 @@ def test_supermajority_failed_proposal():
         sender=user1, now=sp.timestamp(101).add_days(5), level=60)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("rejected"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("rejected"))
 
     # Check that the tokens in escrow have been transferred to the treasury
     scenario.verify(token.data.ledger[user4.address] == 400 - 10)
@@ -824,6 +824,8 @@ def test_quorum_failed_proposal():
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
+    proposal_title = sp.utils.bytes_of_string("Dummy title")
+    proposal_description = sp.utils.bytes_of_string("Dummy description")
     token_transfers = sp.set_type_expr(
         sp.record(
             fa2=token.address,
@@ -833,12 +835,10 @@ def test_quorum_failed_proposal():
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
         t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
-    proposal_title = sp.utils.bytes_of_string("Dummy title")
-    proposal_description = sp.utils.bytes_of_string("Dummy description")
     dao.create_proposal(
-        kind=proposal_kind,
         title=proposal_title,
-        description=proposal_description).run(
+        description=proposal_description,
+        kind=proposal_kind).run(
             sender=user4, level=10, now=sp.timestamp(100))
 
     # Check that the tokens in escrow have been transferred
@@ -860,7 +860,7 @@ def test_quorum_failed_proposal():
         sender=user1, now=sp.timestamp(101).add_days(5), level=60)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.get_proposal(0).status.is_variant("rejected"))
+    scenario.verify(dao.data.proposals[0].status.is_variant("rejected"))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user4.address] == 400)
