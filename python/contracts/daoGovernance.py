@@ -183,7 +183,7 @@ class DAOGovernance(sp.Contract):
                 sp.TPair(sp.TNat, sp.TAddress), DAOGovernance.VOTE_TYPE),
             # The big map with the community representatives votes information
             representatives_votes=sp.TBigMap(
-                sp.TPair(sp.TNat, sp.TAddress), DAOGovernance.VOTE_KIND_TYPE),
+                sp.TPair(sp.TNat, sp.TString), DAOGovernance.VOTE_KIND_TYPE),
             # The proposals counter
             counter=sp.TNat))
 
@@ -400,8 +400,8 @@ class DAOGovernance(sp.Contract):
         sp.set_type(params, sp.TRecord(
             proposal_id=sp.TNat,
             vote=DAOGovernance.VOTE_KIND_TYPE,
-            representative=sp.TAddress).layout(
-                ("proposal_id", ("vote", "representative"))))
+            community=sp.TString).layout(
+                ("proposal_id", ("vote", "community"))))
 
         # Check that the representatives contract executed the entry point
         sp.verify(sp.sender == self.data.representatives,
@@ -421,7 +421,7 @@ class DAOGovernance(sp.Contract):
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
         # Check that the representative didn't vote the proposal before
-        vote_key = sp.pair(params.proposal_id, params.representative)
+        vote_key = sp.pair(params.proposal_id, params.community)
         sp.verify(~self.data.representatives_votes.contains(vote_key),
                   message="DAO_ALREADY_VOTED")
 

@@ -70,7 +70,11 @@ def get_test_environment():
     # Initialize the representatives contract
     representatives = representativesModule.Representatives(
         metadata=sp.utils.metadata_of_url("ipfs://ddd"),
-        users=sp.set([user1.address, user2.address, user3.address, user6.address]),
+        representatives={
+            user1.address: "community1", 
+            user2.address: "community2",
+            user3.address: "community3",
+            user6.address: "community4"},
         dao=admin.address,
         minimum_votes=2,
         expiration_time=3)
@@ -233,7 +237,7 @@ def test_text_proposal():
     scenario.verify(dao.data.proposals[0].representatives_votes.negative == 0)
     scenario.verify(dao.data.proposals[0].representatives_votes.abstain == 1)
     scenario.verify(dao.data.proposals[0].representatives_votes.participation == 1)
-    scenario.verify(dao.data.representatives_votes[(0, user1.address)].is_variant("abstain"))
+    scenario.verify(dao.data.representatives_votes[(0, "community1")].is_variant("abstain"))
 
     # Check that it's not possible to vote twice
     representatives.vote_dao_proposal(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
@@ -247,7 +251,7 @@ def test_text_proposal():
 
     # Check that non representatives cannot vote as representatives
     representatives.vote_dao_proposal(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
-        valid=False, sender=user4, now=sp.timestamp(400), level=40, exception="MS_NOT_USER")
+        valid=False, sender=user4, now=sp.timestamp(400), level=40, exception="REPS_NOT_REPRESENTATIVE")
 
     # User 3, 4 and 5 vote as normal users
     dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
@@ -268,8 +272,8 @@ def test_text_proposal():
     scenario.verify(dao.data.proposals[0].token_votes.negative == 5)
     scenario.verify(dao.data.proposals[0].token_votes.abstain == 0)
     scenario.verify(dao.data.proposals[0].token_votes.participation == 3)
-    scenario.verify(dao.data.representatives_votes[(0, user1.address)].is_variant("abstain"))
-    scenario.verify(dao.data.representatives_votes[(0, user2.address)].is_variant("yes"))
+    scenario.verify(dao.data.representatives_votes[(0, "community1")].is_variant("abstain"))
+    scenario.verify(dao.data.representatives_votes[(0, "community2")].is_variant("yes"))
     scenario.verify(dao.data.token_votes[(0, user3.address)].vote.is_variant("yes"))
     scenario.verify(dao.data.token_votes[(0, user3.address)].weight == 300)
     scenario.verify(dao.data.token_votes[(0, user4.address)].vote.is_variant("yes"))
@@ -971,7 +975,7 @@ def test_set_representatives():
     scenario.verify(dao.data.representatives == representatives.address)
 
     # Add a lambda proposal
-    representatives.lambda_function_proposal(representatives_lambda_function).run(sender=user1)
+    representatives.add_proposal(sp.variant("lambda_function", representatives_lambda_function)).run(sender=user1)
 
     # Vote for the proposal
     representatives.vote_proposal(proposal_id=0, approval=True).run(sender=user1)
