@@ -23,13 +23,23 @@ class DAOGovernance(sp.Contract):
 
     """
 
+    VOTE_WEIGHT_METHOD_TYPE = sp.TVariant(
+        # Linaer or proportional voting: vote weight = DAO token amount
+        linear=sp.TUnit,
+        # Quadractic voting: vote weight = sqrt(DAO token amount)
+        quadratic=sp.TUnit)
+
     GOVERNANCE_PARAMETERS_TYPE = sp.TRecord(
+        # The vote weight method
+        vote_method=VOTE_WEIGHT_METHOD_TYPE,
         # The proposal voting period in days
         voting_period=sp.TNat,
         # The amount of DAO tokens to escrow to create a proposal
         escrow_amount=sp.TNat,
         # The percentage of positive votes needed to return the tokens in escrow
         escrow_return=sp.TNat,
+        # The minimum amout of DAO tokens needed to vote proposals
+        min_amount=sp.TNat,
         # The percentage of positive votes needed to reach super-majority
         supermajority=sp.TNat,
         # The representatives vote share percentage relative to the quorum
@@ -44,7 +54,7 @@ class DAOGovernance(sp.Contract):
         min_quorum=sp.TNat,
         # The maximum possible quorum value
         max_quorum=sp.TNat).layout(
-            ("voting_period", ("escrow_amount", ("escrow_return", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum"))))))))))
+            ("vote_method", ("voting_period", ("escrow_amount", ("escrow_return", ("min_amount", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum"))))))))))))
 
     MUTEZ_TRANSFERS_TYPE = sp.TList(sp.TRecord(
         # The amount of mutez to transfer
@@ -117,6 +127,8 @@ class DAOGovernance(sp.Contract):
         timestamp=sp.TTimestamp,
         # The block level when the proposal was submitted
         level=sp.TNat,
+        # The vote weight method to use for the proposal
+        vote_method=VOTE_WEIGHT_METHOD_TYPE,
         # The amount of DAO tokens in escrow
         escrow_amount=sp.TNat,
         # The proposal current status: open, approved, executed or rejected
@@ -125,7 +137,7 @@ class DAOGovernance(sp.Contract):
         token_votes=VOTES_SUMMARY_TYPE,
         # The proposal votes summary from the community representatives
         representatives_votes=VOTES_SUMMARY_TYPE).layout(
-            ("title", ("description", ("kind", ("issuer", ("timestamp", ("level", ("escrow_amount", ("status", ("token_votes", "representatives_votes"))))))))))
+            ("title", ("description", ("kind", ("issuer", ("timestamp", ("level", ("vote_method", ("escrow_amount", ("status", ("token_votes", "representatives_votes")))))))))))
 
     VOTE_KIND_TYPE = sp.TVariant(
         # A positive vote
@@ -255,6 +267,26 @@ class DAOGovernance(sp.Contract):
             amount=sp.mutez(0),
             destination=transfer_handle)
 
+    @sp.private_lambda(with_storage=None, with_operations=False, wrap_call=True)
+    def integer_square_root(self, number):
+        """Calculates the integer square root of a number using Newton's method.
+
+        https://en.wikipedia.org/wiki/Integer_square_root
+
+        """
+        x0 = sp.local("x0", number // 2)
+
+        with sp.if_(x0.value != 0):
+            x1 = sp.local("x1", (x0.value + number // x0.value) // 2)
+
+            with sp.while_(x1.value < x0.value):
+                x0.value = x1.value
+                x1.value = (x0.value + number // x0.value) // 2
+
+            sp.result(x0.value)
+        with sp.else_():
+            sp.result(number)
+
     def get_prior_token_balance(self, level, max_checkpoints):
         """Gets the sender prior token balance calling the DAO token on-chain
         view.
@@ -311,6 +343,7 @@ class DAOGovernance(sp.Contract):
             issuer=sp.sender,
             timestamp=sp.now,
             level=sp.level,
+            vote_method=self.data.governance_parameters.vote_method,
             escrow_amount=escrow_amount,
             status=sp.variant("open", sp.unit),
             token_votes=sp.record(
@@ -367,29 +400,33 @@ class DAOGovernance(sp.Contract):
         with sp.if_(sp.sender == proposal.issuer):
             token_balance.value += proposal.escrow_amount
 
-        # Check that the token balance is not zero
-        sp.verify(token_balance.value > 0, message="DAO_ZERO_BALANCE")
+        # Check that the token balance is higher than the minimum required amount
+        sp.verify(token_balance.value >= self.data.governance_parameters.min_amount,
+                  message="DAO_INSUFICIENT_BALANCE")
 
-        # Calculate the voting weight (for the moment we assume linear weight)
-        weight = token_balance.value
+        # Calculate the vote weight
+        weight = sp.local("weight", token_balance.value)
+
+        with sp.if_(proposal.vote_method.is_variant("quadratic")):
+            weight.value = self.integer_square_root(token_balance.value // 10000)
 
         # Update the DAO token holders votes summary
         new_votes = sp.local("new_votes", proposal.token_votes)
-        new_votes.value.total += weight
+        new_votes.value.total += weight.value
         new_votes.value.participation += 1
 
         with params.vote.match_cases() as arg:
             with arg.match("yes"):
-                new_votes.value.positive += weight
+                new_votes.value.positive += weight.value
             with arg.match("no"):
-                new_votes.value.negative += weight
+                new_votes.value.negative += weight.value
             with arg.match("abstain"):
-                new_votes.value.abstain += weight
+                new_votes.value.abstain += weight.value
 
         self.data.proposals[params.proposal_id].token_votes = new_votes.value
 
         # Add the vote to the token votes big map
-        self.data.token_votes[vote_key] = sp.record(vote=params.vote, weight=weight)
+        self.data.token_votes[vote_key] = sp.record(vote=params.vote, weight=weight.value)
 
     @sp.entry_point
     def representatives_vote(self, params):
@@ -399,13 +436,8 @@ class DAOGovernance(sp.Contract):
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
             proposal_id=sp.TNat,
-            vote=DAOGovernance.VOTE_KIND_TYPE,
-            community=sp.TString).layout(
-                ("proposal_id", ("vote", "community"))))
-
-        # Check that the representatives contract executed the entry point
-        sp.verify(sp.sender == self.data.representatives,
-                  message="DAO_NOT_REPRESENTATIVE")
+            vote=DAOGovernance.VOTE_KIND_TYPE).layout(
+                ("proposal_id", "vote")))
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
@@ -420,8 +452,15 @@ class DAOGovernance(sp.Contract):
             sp.to_int(self.data.governance_parameters.voting_period))
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
+        # Get the representative community
+        community = sp.view(
+            name="get_representative_community",
+            address=self.data.representatives,
+            param=sp.sender,
+            t=sp.TString).open_some()
+
         # Check that the representative didn't vote the proposal before
-        vote_key = sp.pair(params.proposal_id, params.community)
+        vote_key = sp.compute(sp.pair(params.proposal_id, community))
         sp.verify(~self.data.representatives_votes.contains(vote_key),
                   message="DAO_ALREADY_VOTED")
 
@@ -554,7 +593,7 @@ class DAOGovernance(sp.Contract):
                 amount=proposal.escrow_amount))
 
         # Check if the proposal passed the required thresholds to be approved
-        passed_supermajority = positive > ((positive_and_negative * self.data.governance_parameters.supermajority) // 100)
+        passed_supermajority = sp.compute(positive > ((positive_and_negative * self.data.governance_parameters.supermajority) // 100))
         passed_quorum = total > self.data.quorum
 
         # Set the proposal status as rejected or approved depending on the result
@@ -566,10 +605,12 @@ class DAOGovernance(sp.Contract):
         self.data.proposals[proposal_id].status = new_status.value
 
         # Check if the quorum can be updated
+        # To minimize the effect of spam proposals, quorum updates cannot be too
+        # often and can only happen for proposals that had a super-majority
         min_quorum_update_date = self.data.last_quorum_update.add_days(
             sp.to_int(self.data.governance_parameters.quorum_update_period))
 
-        with sp.if_(sp.now > min_quorum_update_date):
+        with sp.if_((sp.now > min_quorum_update_date) & passed_supermajority):
             # Calculate the new quorum value
             old_quorum_contribution = self.data.quorum * sp.as_nat(100 - self.data.governance_parameters.quorum_update)
             proposal_contribution = total * self.data.governance_parameters.quorum_update
@@ -695,6 +736,19 @@ class DAOGovernance(sp.Contract):
         # Update the governance parameters
         self.data.governance_parameters = new_governance_parameters
 
+    @sp.entry_point(private=True)
+    def get_integer_square_root(self, number):
+        """Returns the square root of the given number.
+
+        Note that this is a private entrypoint only used for testing purposes.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(number, sp.TNat)
+
+        # Store the result in the counter just for test purposes
+        self.data.counter = self.integer_square_root(number)
+
 
 sp.add_compilation_target("dao", DAOGovernance(
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
@@ -703,9 +757,11 @@ sp.add_compilation_target("dao", DAOGovernance(
     representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekcc"),
     quorum=8000,
     governance_parameters=sp.record(
+        vote_method=sp.variant("linear", sp.unit),
         voting_period=5,
         escrow_amount=100,
         escrow_return=30,
+        min_amount=1,
         supermajority=70,
         representatives_share=30,
         quorum_update_period=10,

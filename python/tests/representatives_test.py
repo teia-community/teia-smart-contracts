@@ -71,7 +71,6 @@ def get_test_environment():
     representative3 = sp.test_account("representative3")
     representative4 = sp.test_account("representative4")
     non_representative = sp.test_account("non_representative")
-    dao = sp.test_account("dao")
 
     # Initialize the representatives contract
     representatives = representativesModule.Representatives(
@@ -81,7 +80,6 @@ def get_test_environment():
             representative2.address: "community2",
             representative3.address: "community3",
             representative4.address: "community4"},
-        dao=dao.address,
         minimum_votes=3,
         expiration_time=3)
     representatives.set_initial_balance(sp.tez(10))
@@ -95,7 +93,6 @@ def get_test_environment():
         "representative3" : representative3,
         "representative4" : representative4,
         "non_representative" : non_representative,
-        "dao": dao,
         "representatives" : representatives}
 
     return testEnvironment
@@ -635,44 +632,3 @@ def test_expiration_time_proposal():
 
     # Check that the expiration time parameter has been updated
     scenario.verify(representatives.data.expiration_time == 100)
-
-
-@sp.add_test(name="Test set dao")
-def test_set_dao():
-    # Get the test environment
-    testEnvironment = get_test_environment()
-    scenario = testEnvironment["scenario"]
-    representative1 = testEnvironment["representative1"]
-    representative2 = testEnvironment["representative2"]
-    representative3 = testEnvironment["representative3"]
-    representative4 = testEnvironment["representative4"]
-    dao = testEnvironment["dao"]
-    representatives = testEnvironment["representatives"]
-
-    # Create a new DAO test account
-    new_dao = sp.test_account("new_dao")
-
-    # Define the lambda function that will set the new DAO address
-    def dao_lambda_function(params):
-        sp.set_type(params, sp.TUnit)
-        set_dao_handle = sp.contract(sp.TAddress, representatives.address, "set_dao").open_some()
-        sp.result([sp.transfer_operation(new_dao.address, sp.mutez(0), set_dao_handle)])
-
-    # Check the initial DAO address
-    scenario.verify(representatives.data.dao == dao.address)
-
-    # Add a lambda proposal
-    representatives.add_proposal(sp.variant("lambda_function", dao_lambda_function)).run(sender=representative4)
-
-    # Vote for the proposal
-    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=representative1)
-    representatives.vote_proposal(proposal_id=0, approval=False).run(sender=representative2)
-    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=representative3)
-    representatives.vote_proposal(proposal_id=0, approval=True).run(sender=representative4)
-
-    # Execute the proposal
-    representatives.execute_proposal(0).run(sender=representative3)
-
-    # Check that the DAO address has been updated
-    scenario.verify(representatives.data.dao == new_dao.address)
-

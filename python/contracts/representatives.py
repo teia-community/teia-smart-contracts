@@ -91,7 +91,7 @@ class Representatives(sp.Contract):
         # An abstain vote
         abstain=sp.TUnit)
 
-    def __init__(self, metadata, representatives, dao, minimum_votes, expiration_time):
+    def __init__(self, metadata, representatives, minimum_votes, expiration_time):
         """Initializes the contract.
 
         """
@@ -103,8 +103,6 @@ class Representatives(sp.Contract):
             representatives=sp.TMap(sp.TAddress, sp.TString),
             # The Teia communities represented in the contract
             communities=sp.TSet(sp.TString),
-            # The DAO governance contract address
-            dao=sp.TAddress,
             # The minimum number of positive votes needed to execute a proposal
             minimum_votes=sp.TNat,
             # The proposals expiration time in days
@@ -121,7 +119,6 @@ class Representatives(sp.Contract):
             metadata=metadata,
             representatives=representatives,
             communities=sp.set(representatives.values()),
-            dao=dao,
             minimum_votes=minimum_votes,
             expiration_time=expiration_time,
             proposals=sp.big_map(),
@@ -366,60 +363,24 @@ class Representatives(sp.Contract):
         self.data.representatives[new_address] = community
         del self.data.representatives[sp.sender]
 
-    @sp.entry_point
-    def vote_dao_proposal(self, params):
-        """Votes a DAO proposal as a representative.
+
+    @sp.onchain_view()
+    def get_representative_community(self, address):
+        """Returns the representative community
 
         """
         # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            proposal_id=sp.TNat,
-            vote=Representatives.VOTE_KIND_TYPE).layout(
-                ("proposal_id", "vote")))
+        sp.set_type(address, sp.TAddress)
 
-        # Check that one of the representatives executed the entry point
+        # Check that the given address is from a community representative
         community = self.data.representatives.get(
-            sp.sender, message="REPS_NOT_REPRESENTATIVE")
+            address, message="REPS_NOT_REPRESENTATIVE")
 
-        # Get a handle to the DAO representatives vote entry point
-        representatives_vote_handle = sp.contract(
-            t=sp.TRecord(
-                proposal_id=sp.TNat,
-                vote=Representatives.VOTE_KIND_TYPE,
-                community=sp.TString).layout(
-                    ("proposal_id", ("vote", "community"))),
-            address=self.data.dao,
-            entry_point="representatives_vote").open_some()
-
-        # Vote as a representative the DAO proposal
-        sp.transfer(
-            arg=sp.record(
-                proposal_id=params.proposal_id,
-                vote=params.vote,
-                community=community),
-            amount=sp.mutez(0),
-            destination=representatives_vote_handle)
-
-    @sp.entry_point
-    def set_dao(self, new_dao):
-        """Updates the DAO contract address.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(new_dao, sp.TAddress)
-
-        # Check that the DAO or the multisig executed the entry point
-        sp.verify((sp.sender == self.data.dao) | 
-                  (sp.sender == sp.self_address),
-                  message="REPS_NOT_DAO_OR_REPRESENTATIVES")
-
-        # Update the DAO contract address
-        self.data.dao = new_dao
-
+        # Return the representative community
+        sp.result(community)
 
 sp.add_compilation_target("representatives", Representatives(
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
     representatives={sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"): "community1"},
-    dao=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekbb"),
     minimum_votes=sp.nat(1),
     expiration_time=sp.nat(7)))
