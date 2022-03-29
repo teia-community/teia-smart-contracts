@@ -14,6 +14,7 @@ class DAOGovernance(sp.Contract):
         - It considers two kinds of DAO members: DAO token holders and
           community representatives.
         - Many proposals can run at the same time.
+        - It could use linear or quadratic voting methods.
         - Members do not need to escrow their DAO tokens for voting, only to
           create proposals.
         - It uses on-chain views instead of callback functions to access DAO
