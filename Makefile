@@ -5,9 +5,12 @@
 #   TARGET=daoToken make compile test 
 #
 
+# Location of SmartPy CLI
+ifeq ($(SMARTPY_DIR),)
+  SMARTPY_DIR:=~/smartpy-cli
+endif
 
-# Location of SmartPy CLI (adjust to local installation, or set environment variable)
-SMARTPY:=~/ext/smartpy-cli/SmartPy.sh
+SMARTPY:=${SMARTPY_DIR}/SmartPy.sh
 
 SHELL:=bash
 
