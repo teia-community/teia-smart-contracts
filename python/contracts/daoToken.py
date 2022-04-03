@@ -1,5 +1,5 @@
 import smartpy as sp
-
+from teia_sc.error_collection import ErrorCollection
 
 class DAOToken(sp.Contract):
     """This contract adapts the FA2 contract template example in smartpy.io
@@ -45,6 +45,16 @@ class DAOToken(sp.Contract):
         # The owner token balance
         balance=sp.TNat).layout(
             ("level", "balance"))
+
+    # Start a collection for smart contract errors
+    error_collection = ErrorCollection(__name__)
+    # Set a shorthand wrapper function to reference and add error info.
+    @staticmethod
+    def _add_error(*args, **kwargs): 
+        "Helper method to collect metadata for errors" 
+        # All failwith errors return the same type for this contract:
+        kwargs.update(failwith_type='string', expansion_type='string')
+        return DAOToken.error_collection.add_error(*args, **kwargs)
 
     def __init__(self, administrator, metadata, token_metadata, max_supply, max_share):
         """Initializes the contract.
@@ -95,6 +105,40 @@ class DAOToken(sp.Contract):
             max_share_exceptions=sp.set([]),
             proposed_administrator=sp.none)
 
+        # A function handle to wrap calls to error_collection.add_error()
+        global ERR
+        ERR = DAOToken._add_error
+
+        # Contract error codes, messages for expansion and documentation.
+        ERR(        "FA2_NOT_ADMIN", 
+         expansion = "The caller must be the contract administrator.",
+         doc       = """Only the contract administrator can perform these operations:
+mint, transfer_administrator, set_metadata, add_max_share_exception""")
+        ERR("FA2_NOT_OPERATOR",
+          expansion="",
+          )
+        ERR("FA2_SENDER_IS_NOT_OWNER",
+          expansion="",
+          )
+        ERR("FA2_SHARE_EXCESS",
+          expansion="",
+          )
+        ERR("FA2_SUPPLY_EXCEEDED",
+          expansion="",
+          )
+        ERR("FA2_TOKEN_UNDEFINED",
+          expansion="",
+          )
+        ERR("FA2_WRONG_LEVEL",
+          expansion="",
+          )
+        ERR("FA2_WRONG_MAX_CHECKPOINTS",
+          expansion="",
+          )
+        ERR("FA_NOT_PROPOSED_ADMIN",
+          expansion="",
+          )
+
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
         contract_metadata = {
@@ -108,6 +152,7 @@ class DAOToken(sp.Contract):
                 "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
+            "errors": DAOToken.error_collection.tzip16_metadata(),
             "views": [
                 self.get_balance,
                 self.total_supply,
@@ -124,19 +169,20 @@ class DAOToken(sp.Contract):
 
         self.init_metadata("contract_metadata", contract_metadata)
 
+
     def check_is_administrator(self):
         """Checks that the address that called the entry point is the contract
         administrator.
 
         """
-        sp.verify(sp.sender == self.data.administrator, message="FA2_NOT_ADMIN")
+        sp.verify(sp.sender == self.data.administrator, message=ERR("FA2_NOT_ADMIN"))
 
     @sp.private_lambda(with_storage=None, wrap_call=True)
     def check_token_exists(self, token_id):
         """Checks that the given token exists.
 
         """
-        sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
+        sp.verify(token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
 
     @sp.private_lambda(with_storage="read-write", wrap_call=True)
     def add_checkpoint(self, owner):
@@ -198,13 +244,13 @@ class DAOToken(sp.Contract):
             self.data.supply += mint.amount
 
             # Check that the balance is lower than the maximum share
-            sp.verify(self.data.max_share_exceptions.contains(mint.to_) | 
+            sp.verify(self.data.max_share_exceptions.contains(mint.to_) |
                       (self.data.ledger[mint.to_] < self.data.max_share),
-                      message="FA2_SHARE_EXCESS")
+                      message=ERR("FA2_SHARE_EXCESS"))
 
             # Check that the total supply is not larger than the maximum supply
             sp.verify(self.data.supply <= self.data.max_supply,
-                      message="FA2_SUPPLY_EXCEEDED")
+                      message=ERR("FA2_SUPPLY_EXCEEDED"))
 
             # Add a balance checkpoint
             self.add_checkpoint(mint.to_)
@@ -233,12 +279,12 @@ class DAOToken(sp.Contract):
                 # Check that the sender is one of the token operators
                 owner = sp.compute(transfer.from_)
                 sp.verify(
-                    (sp.sender == owner) | 
+                    (sp.sender == owner) |
                     self.data.operators.contains(sp.record(
                         owner=owner,
                         operator=sp.sender,
                         token_id=0)),
-                    message="FA2_NOT_OPERATOR")
+                    message=ERR("FA2_NOT_OPERATOR"))
 
                 # Check that the transfer amount is not zero
                 with sp.if_(tx.amount > 0):
@@ -252,9 +298,9 @@ class DAOToken(sp.Contract):
                         tx.to_, 0) + tx.amount
 
                     # Check that the balance is lower than the maximum share
-                    sp.verify(self.data.max_share_exceptions.contains(tx.to_) | 
+                    sp.verify(self.data.max_share_exceptions.contains(tx.to_) |
                               (self.data.ledger[tx.to_] < self.data.max_share),
-                              message="FA2_SHARE_EXCESS")
+                              message=ERR("FA2_SHARE_EXCESS"))
 
                     # Add the new balance checkpoints
                     self.add_checkpoint(owner)
@@ -307,7 +353,7 @@ class DAOToken(sp.Contract):
 
                     # Check that the sender is the token owner
                     sp.verify(sp.sender == operator_key.owner,
-                              message="FA2_SENDER_IS_NOT_OWNER")
+                              message=ERR("FA2_SENDER_IS_NOT_OWNER"))
 
                     # Add the new operator to the operators big map
                     self.data.operators[operator_key] = sp.unit
@@ -317,7 +363,7 @@ class DAOToken(sp.Contract):
 
                     # Check that the sender is the token owner
                     sp.verify(sp.sender == operator_key.owner,
-                              message="FA2_SENDER_IS_NOT_OWNER")
+                              message=ERR("FA2_SENDER_IS_NOT_OWNER"))
 
                     # Remove the operator from the operators big map
                     del self.data.operators[operator_key]
@@ -344,7 +390,7 @@ class DAOToken(sp.Contract):
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            "FA_NO_NEW_ADMIN"), message="FA_NOT_PROPOSED_ADMIN")
+            "FA_NO_NEW_ADMIN"), message=ERR("FA_NOT_PROPOSED_ADMIN"))
 
         # Set the new administrator address
         self.data.administrator = sp.sender
@@ -395,12 +441,12 @@ class DAOToken(sp.Contract):
             max_checkpoints=sp.TOption(sp.TNat)).layout(("owner", ("level", "max_checkpoints"))))
 
         # Check that the requested level is smaller than the current level
-        sp.verify(params.level < sp.level, message="FA2_WRONG_LEVEL")
+        sp.verify(params.level < sp.level, message=ERR("FA2_WRONG_LEVEL"))
 
         # Check that, if defined, max checkpoints is larger than zero
-        sp.verify(~params.max_checkpoints.is_some() | 
+        sp.verify(~params.max_checkpoints.is_some() |
                   (params.max_checkpoints.open_some() > 0),
-                  message="FA2_WRONG_MAX_CHECKPOINTS")
+                  message=ERR("FA2_WRONG_MAX_CHECKPOINTS"))
 
         # Check if the owner has any checkpoints
         with sp.if_(~self.data.n_checkpoints.contains(params.owner)):
@@ -447,7 +493,7 @@ class DAOToken(sp.Contract):
             token_id=sp.TNat).layout(("owner", "token_id")))
 
         # Check that the token exists
-        sp.verify(params.token_id == 0, message="FA2_TOKEN_UNDEFINED")
+        sp.verify(params.token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
 
         # Return the owner token balance
         sp.result(self.data.ledger.get(params.owner, 0))
@@ -461,7 +507,7 @@ class DAOToken(sp.Contract):
         sp.set_type(token_id, sp.TNat)
 
         # Check that the token exists
-        sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
+        sp.verify(token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
 
         # Return the token total supply
         sp.result(self.data.supply)
@@ -482,7 +528,7 @@ class DAOToken(sp.Contract):
         sp.set_type(params, DAOToken.OPERATOR_KEY_TYPE)
 
         # Check that the token exists
-        sp.verify(params.token_id == 0, message="FA2_TOKEN_UNDEFINED")
+        sp.verify(params.token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
 
         # Return true if the token operator exists
         sp.result(self.data.operators.contains(params))
@@ -497,7 +543,8 @@ class DAOToken(sp.Contract):
 
         # Return the token metadata
         sp.result(self.data.token_metadata.get(
-            token_id, message="FA2_TOKEN_UNDEFINED"))
+            token_id, message=ERR("FA2_TOKEN_UNDEFINED")))
+
 
 
 sp.add_compilation_target("daoToken", DAOToken(

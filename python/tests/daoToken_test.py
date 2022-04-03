@@ -904,3 +904,9 @@ def test_add_max_share_exception():
 
     # Check that only the admin can add exceptions
     fa2.add_max_share_exception(user1.address).run(valid=False, sender=user2)
+
+
+@sp.add_test(name="Lint FAILWITH messages")
+def test_error_message_rules():
+    scenario = sp.test_scenario()
+    daoTokenModule.DAOToken.error_collection.scenario_linting_report(scenario)
