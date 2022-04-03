@@ -9,6 +9,7 @@ daoTokenModule = sp.io.import_script_from_url("file:contracts/daoToken.py")
 daoTreasuryModule = sp.io.import_script_from_url("file:contracts/daoTreasury.py")
 daoGovernanceModule = sp.io.import_script_from_url("file:contracts/daoGovernance.py")
 representativesModule = sp.io.import_script_from_url("file:contracts/representatives.py")
+multisigWalletModule = sp.io.import_script_from_url("file:contracts/multisigWallet_v1.py")
 
 
 class Recipient(sp.Contract):
@@ -79,16 +80,27 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
         expiration_time=3)
     scenario += representatives
 
+    # Initialize the DAO guardians contract
+    guardians = multisigWalletModule.MultisigWallet(
+        metadata=sp.utils.metadata_of_url("ipfs://eee"),
+        users=sp.set([user4.address, user5.address]),
+        minimum_votes=2,
+        expiration_time=3)
+    scenario += guardians
+
     # Initialize the DAO governance contract
     dao = daoGovernanceModule.DAOGovernance(
-        metadata=sp.utils.metadata_of_url("ipfs://eee"),
+        metadata=sp.utils.metadata_of_url("ipfs://fff"),
+        administrator=admin.address,
         treasury=treasury.address,
         token=token.address,
         representatives=representatives.address,
+        guardians=guardians.address,
         quorum=800,
         governance_parameters=sp.record(
             vote_method=sp.variant(vote_weight_mode, sp.unit),
-            voting_period=5,
+            vote_period=5,
+            wait_period=2,
             escrow_amount=10 * decimals,
             escrow_return=40,
             min_amount=1,
@@ -146,6 +158,7 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
         "token": token,
         "treasury": treasury,
         "representatives": representatives,
+        "guardians": guardians,
         "dao": dao}
 
     return testEnvironment
@@ -156,6 +169,7 @@ def test_text_proposal():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
@@ -166,13 +180,16 @@ def test_text_proposal():
     token = testEnvironment["token"]
     treasury = testEnvironment["treasury"]
     representatives = testEnvironment["representatives"]
+    guardians = testEnvironment["guardians"]
     dao = testEnvironment["dao"]
 
     # Check that the initial contract storage information is correct
-    scenario.verify(dao.data.metadata[""] == sp.utils.bytes_of_string("ipfs://eee"))
+    scenario.verify(dao.data.metadata[""] == sp.utils.bytes_of_string("ipfs://fff"))
+    scenario.verify(dao.data.administrator == admin.address)
     scenario.verify(dao.data.treasury == treasury.address)
     scenario.verify(dao.data.token == token.address)
     scenario.verify(dao.data.representatives == representatives.address)
+    scenario.verify(dao.data.guardians == guardians.address)
     scenario.verify(dao.data.quorum == 800)
     scenario.verify(dao.data.last_quorum_update == sp.timestamp(0))
     scenario.verify(dao.data.counter == 0)
@@ -241,8 +258,10 @@ def test_text_proposal():
     # Check that it's not possible to vote twice
     dao.representatives_vote(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
         valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
-    # dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
-    #    valid=False, sender=user1, now=sp.timestamp(250), level=25, exception="DAO_ALREADY_VOTED")
+
+    # Check that the representative can also vote with their tokens
+    dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+        sender=user1, now=sp.timestamp(250), level=25)
 
     # User 2 votes as representative
     dao.representatives_vote(proposal_id=0, vote=sp.variant("yes", sp.unit)).run(
@@ -266,13 +285,15 @@ def test_text_proposal():
     scenario.verify(dao.data.proposals[0].representatives_votes.negative == 0)
     scenario.verify(dao.data.proposals[0].representatives_votes.abstain == 1)
     scenario.verify(dao.data.proposals[0].representatives_votes.participation == 2)
-    scenario.verify(dao.data.proposals[0].token_votes.total == 300 + 400 + 5)
-    scenario.verify(dao.data.proposals[0].token_votes.positive == 300 + 400)
+    scenario.verify(dao.data.proposals[0].token_votes.total == 100 + 300 + 400 + 5)
+    scenario.verify(dao.data.proposals[0].token_votes.positive == 100 + 300 + 400)
     scenario.verify(dao.data.proposals[0].token_votes.negative == 5)
     scenario.verify(dao.data.proposals[0].token_votes.abstain == 0)
-    scenario.verify(dao.data.proposals[0].token_votes.participation == 3)
+    scenario.verify(dao.data.proposals[0].token_votes.participation == 4)
     scenario.verify(dao.data.representatives_votes[(0, "community1")].is_variant("abstain"))
     scenario.verify(dao.data.representatives_votes[(0, "community2")].is_variant("yes"))
+    scenario.verify(dao.data.token_votes[(0, user1.address)].vote.is_variant("yes"))
+    scenario.verify(dao.data.token_votes[(0, user1.address)].weight == 100)
     scenario.verify(dao.data.token_votes[(0, user3.address)].vote.is_variant("yes"))
     scenario.verify(dao.data.token_votes[(0, user3.address)].weight == 300)
     scenario.verify(dao.data.token_votes[(0, user4.address)].vote.is_variant("yes"))
@@ -312,26 +333,31 @@ def test_text_proposal():
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("approved"))
-    scenario.verify(dao.data.quorum == int(800 * 0.8 + (300 + 400 + 5 + 800 * 0.3) * 0.2))
+    scenario.verify(dao.data.quorum == int(800 * 0.8 + (100 + 300 + 400 + 5 + 800 * 0.3) * 0.2))
     scenario.verify(dao.data.last_quorum_update == sp.timestamp(101).add_days(5))
 
     # Check that the tokens in escrow have been transferred back to user 4
     scenario.verify(token.data.ledger[user4.address] == 400)
     scenario.verify(token.data.ledger[dao.address] == 0)
 
+    # Check that it's not possible to execute a proposal before the wating time
+    # has passed
+    dao.execute_proposal(0).run(
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5 + 1), exception="DAO_WAITING_PROPOSAL")
+
     # Check that only DAO members can execute the proposal
     dao.execute_proposal(0).run(
-        valid=False, sender=external_user, exception="DAO_NOT_MEMBER")
+        valid=False, sender=external_user, now=sp.timestamp(101).add_days(5 + 2), exception="DAO_NOT_MEMBER")
 
     # Execute the proposal
-    dao.execute_proposal(0).run(sender=user1)
+    dao.execute_proposal(0).run(sender=user1, now=sp.timestamp(101).add_days(5 + 2))
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
 
     # Check that it's not possible to execute twice the proposal
     dao.execute_proposal(0).run(
-        valid=False, sender=user1, exception="DAO_STATUS_NOT_APPROVED")
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5 + 2), exception="DAO_STATUS_NOT_APPROVED")
 
 
 @sp.add_test(name="Test transfer mutez proposal")
@@ -408,7 +434,7 @@ def test_transfer_mutez_proposal():
     scenario.verify(token.data.ledger[dao.address] == 0)
 
     # Execute the proposal
-    dao.execute_proposal(0).run(sender=user1)
+    dao.execute_proposal(0).run(sender=user1, now=sp.timestamp(101).add_days(5 + 2))
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
@@ -493,7 +519,7 @@ def test_transfer_token_proposal():
     scenario.verify(token.data.ledger[dao.address] == 0)
 
     # Execute the proposal
-    dao.execute_proposal(0).run(sender=user1)
+    dao.execute_proposal(0).run(sender=user1, now=sp.timestamp(101).add_days(5 + 2))
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
@@ -579,7 +605,7 @@ def test_lambda_function_proposal():
     scenario.verify(token.data.ledger[dao.address] == 0)
 
     # Execute the proposal
-    dao.execute_proposal(0).run(sender=user1)
+    dao.execute_proposal(0).run(sender=user1, now=sp.timestamp(101).add_days(5 + 2))
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("executed"))
@@ -596,7 +622,8 @@ def test_lambda_function_proposal():
         sp.result([sp.transfer_operation(
             sp.record(
                 vote_method=sp.variant("linear", sp.unit),
-                voting_period=5,
+                vote_period=5,
+                wait_period=2,
                 escrow_amount=20,
                 escrow_return=30,
                 min_amount=6,
@@ -661,7 +688,7 @@ def test_lambda_function_proposal():
     scenario.verify(token.data.ledger[dao.address] == 0)
 
     # Execute the proposal
-    dao.execute_proposal(1).run(sender=user1)
+    dao.execute_proposal(1).run(sender=user1, now=sp.timestamp(501).add_days(5 + 2))
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[1].status.is_variant("executed"))
@@ -732,7 +759,7 @@ def test_lambda_function_proposal():
     scenario.verify(token.data.ledger[dao.address] == 0)
 
     # Execute the proposal
-    dao.execute_proposal(2).run(sender=user1)
+    dao.execute_proposal(2).run(sender=user1, now=sp.timestamp(1001).add_days(5 + 2))
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[2].status.is_variant("executed"))
@@ -754,6 +781,7 @@ def test_cancel_proposal():
     external_user = testEnvironment["external_user"]
     token = testEnvironment["token"]
     treasury = testEnvironment["treasury"]
+    guardians = testEnvironment["guardians"]
     dao = testEnvironment["dao"]
 
     # User 4 creates a proposal
@@ -787,15 +815,16 @@ def test_cancel_proposal():
         sender=user5, now=sp.timestamp(400), level=40)
 
     # Check that it's not possible to cancel an innexisting proposal
-    dao.cancel_proposal(1).run(
+    dao.cancel_proposal(proposal_id=1, return_escrow=True).run(
         valid=False, sender=user4, now=sp.timestamp(500), level=50, exception="DAO_INEXISTENT_PROPOSAL")
 
     # Check that only the proposal issuer can cancel the proposal
-    dao.cancel_proposal(0).run(
-        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER")
+    dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
+        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER_OR_GUARDIANS")
 
     # Cancel the proposal
-    dao.cancel_proposal(0).run(sender=user4, now=sp.timestamp(500), level=50)
+    dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
+        sender=user4, now=sp.timestamp(500), level=50)
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("cancelled"))
@@ -806,12 +835,74 @@ def test_cancel_proposal():
     scenario.verify(token.data.ledger[treasury.address] == 990 + 10)
 
     # Check that it's not possible to cancel, evaluate or execute the proposal
-    dao.cancel_proposal(0).run(
+    dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
         valid=False, sender=user4, now=sp.timestamp(600), level=60, exception="DAO_STATUS_NOT_OPEN_OR_APPROVED")
     dao.evaluate_voting_result(0).run(
         valid=False, sender=user1, now=sp.timestamp(101).add_days(5), level=60, exception="DAO_STATUS_NOT_OPEN")
     dao.execute_proposal(0).run(
-        valid=False, sender=user1, exception="DAO_STATUS_NOT_APPROVED")
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5 + 2), exception="DAO_STATUS_NOT_APPROVED")
+
+    # User 1 creates 3 proposals
+    proposal_title = sp.utils.bytes_of_string("Dummy title")
+    proposal_description = sp.utils.bytes_of_string("Dummy description")
+    proposal_kind = sp.variant("text", sp.unit)
+    dao.create_proposal(
+        title=proposal_title,
+        description=proposal_description,
+        kind=proposal_kind).run(sender=user1, level=70)
+    dao.create_proposal(
+        title=proposal_title,
+        description=proposal_description,
+        kind=proposal_kind).run(sender=user1, level=70)
+    dao.create_proposal(
+        title=proposal_title,
+        description=proposal_description,
+        kind=proposal_kind).run(sender=user1, level=70)
+
+    # Check that the tokens in escrow have been transferred
+    scenario.verify(token.data.ledger[user1.address] == 100 - 30)
+    scenario.verify(token.data.ledger[dao.address] == 30)
+
+    # The users vote the first new proposal
+    dao.token_vote(proposal_id=1, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+        sender=user3, now=sp.timestamp(800), level=80)
+    dao.token_vote(proposal_id=1, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+        sender=user4, now=sp.timestamp(800), level=80)
+    dao.token_vote(proposal_id=1, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
+        sender=user5, now=sp.timestamp(800), level=80)
+
+    # Define the lambda function that will cancel all the proposals
+    def guardians_lambda_function(params):
+        sp.set_type(params, sp.TUnit)
+        cancel_proposal_handle = sp.contract(
+            sp.TRecord(proposal_id=sp.TNat, return_escrow=sp.TBool).layout(
+                ("proposal_id", "return_escrow")),
+            dao.address,
+            "cancel_proposal").open_some()
+        sp.result([
+            sp.transfer_operation(sp.record(proposal_id=1, return_escrow=False), sp.mutez(0), cancel_proposal_handle),
+            sp.transfer_operation(sp.record(proposal_id=2, return_escrow=False), sp.mutez(0), cancel_proposal_handle),
+            sp.transfer_operation(sp.record(proposal_id=3, return_escrow=False), sp.mutez(0), cancel_proposal_handle)])
+
+    # Add a lambda proposal
+    guardians.lambda_function_proposal(guardians_lambda_function).run(sender=user4)
+
+    # Vote for the proposal
+    guardians.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    guardians.vote_proposal(proposal_id=0, approval=True).run(sender=user5)
+
+    # Execute the proposal
+    guardians.execute_proposal(0).run(sender=user4, now=sp.timestamp(900), level=90)
+
+    # Check that the contract information has been updated
+    scenario.verify(dao.data.proposals[1].status.is_variant("cancelled"))
+    scenario.verify(dao.data.proposals[2].status.is_variant("cancelled"))
+    scenario.verify(dao.data.proposals[3].status.is_variant("cancelled"))
+
+    # Check that the tokens in escrow have been transferred to the treasury
+    scenario.verify(token.data.ledger[user1.address] == 100 - 30)
+    scenario.verify(token.data.ledger[dao.address] == 0)
+    scenario.verify(token.data.ledger[treasury.address] == 990 + 10 + 30)
 
 
 @sp.add_test(name="Test supermajority failed proposal")
@@ -879,7 +970,7 @@ def test_supermajority_failed_proposal():
 
     # Check that it's not possible to execute the proposal
     dao.execute_proposal(0).run(
-        valid=False, sender=user1, exception="DAO_STATUS_NOT_APPROVED")
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5 + 2), exception="DAO_STATUS_NOT_APPROVED")
 
 
 @sp.add_test(name="Test quorum failed proposal")
@@ -942,7 +1033,7 @@ def test_quorum_failed_proposal():
 
     # Check that it's not possible to execute the proposal
     dao.execute_proposal(0).run(
-        valid=False, sender=user1, exception="DAO_STATUS_NOT_APPROVED")
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5 + 2), exception="DAO_STATUS_NOT_APPROVED")
 
 
 @sp.add_test(name="Test set representatives")
@@ -984,6 +1075,83 @@ def test_set_representatives():
     # Check that the representatives address has been updated
     scenario.verify(dao.data.representatives == new_representatives.address)
 
+    # Check that the old representatives cannot set the representatives again
+    representatives.add_proposal(sp.variant("lambda_function", representatives_lambda_function)).run(sender=user1)
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user1)
+    representatives.vote_proposal(proposal_id=1, approval=False).run(sender=user2)
+    representatives.vote_proposal(proposal_id=1, approval=True).run(sender=user3)
+    representatives.execute_proposal(1).run(
+        valid=False, sender=user3, exception="DAO_NOT_DAO_OR_REPRESENTATIVES")
+
+
+@sp.add_test(name="Test set guardians")
+def test_set_guardians():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    user4 = testEnvironment["user4"]
+    user5 = testEnvironment["user5"]
+    dao = testEnvironment["dao"]
+    guardians = testEnvironment["guardians"]
+
+    # Create a new DAO guardians account
+    new_guardians = sp.test_account("new_guardians")
+
+    # Define the lambda function that will set the new guardians address
+    def guardians_lambda_function(params):
+        sp.set_type(params, sp.TUnit)
+        set_guardians_handle = sp.contract(
+            sp.TAddress, dao.address, "set_guardians").open_some()
+        sp.result([sp.transfer_operation(
+            new_guardians.address, sp.mutez(0), set_guardians_handle)])
+
+    # Check the initial DAO guardians address
+    scenario.verify(dao.data.guardians == guardians.address)
+
+    # Add a lambda proposal
+    guardians.lambda_function_proposal(guardians_lambda_function).run(sender=user4)
+
+    # Vote for the proposal
+    guardians.vote_proposal(proposal_id=0, approval=True).run(sender=user4)
+    guardians.vote_proposal(proposal_id=0, approval=True).run(sender=user5)
+
+    # Execute the proposal
+    guardians.execute_proposal(0).run(sender=user4)
+
+    # Check that the representatives address has been updated
+    scenario.verify(dao.data.guardians == new_guardians.address)
+
+    # Check that the old DAO guardians cannot set the guardians again
+    guardians.lambda_function_proposal(guardians_lambda_function).run(sender=user4)
+    guardians.vote_proposal(proposal_id=1, approval=True).run(sender=user4)
+    guardians.vote_proposal(proposal_id=1, approval=True).run(sender=user5)
+    guardians.execute_proposal(1).run(
+        valid=False, sender=user4, exception="DAO_NOT_DAO_OR_GUARDIANS")
+
+
+@sp.add_test(name="Test admin")
+def test_admin():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    dao = testEnvironment["dao"]
+
+    # Create a new treasury account
+    new_treasury = sp.test_account("new_treasury")
+
+    # Update the DAO treasury address
+    dao.set_treasury(new_treasury.address).run(sender=admin)
+
+    # Check that the treasury address has been updated
+    scenario.verify(dao.data.treasury == new_treasury.address)
+
+    # Update the DAO quorum
+    dao.set_quorum(2).run(sender=admin)
+
+    # Check that the quorum has been updated
+    scenario.verify(dao.data.quorum == 2)
+
 
 @sp.add_test(name="Test integer square root")
 def test_integer_square_root():
@@ -1024,7 +1192,7 @@ def test_integer_square_root():
 
 
 @sp.add_test(name="Test quadratic voting")
-def test_text_proposal():
+def test_quadratic_voting():
     # Get the test environment
     testEnvironment = get_test_environment(
         vote_weight_mode="quadratic", decimals=1000000)
