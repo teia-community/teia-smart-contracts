@@ -21,11 +21,15 @@ class DAOGovernance(sp.Contract):
           token balances.
         - DAO governance parameters can be updated via lambda proposals.
         - Separates the DAO governance from the DAO treasury.
+        - It includes the figure of the DAO guardians, which could cancel
+          malicious proposals.
+        - It includes the figure of the DAO administrator, which could update
+          some of the DAO parameters, like the quorum.
 
     """
 
     VOTE_WEIGHT_METHOD_TYPE = sp.TVariant(
-        # Linaer or proportional voting: vote weight = DAO token amount
+        # Linear/proportional voting: vote weight = DAO token amount
         linear=sp.TUnit,
         # Quadractic voting: vote weight = sqrt(DAO token amount)
         quadratic=sp.TUnit)
@@ -34,7 +38,9 @@ class DAOGovernance(sp.Contract):
         # The vote weight method
         vote_method=VOTE_WEIGHT_METHOD_TYPE,
         # The proposal voting period in days
-        voting_period=sp.TNat,
+        vote_period=sp.TNat,
+        # The proposal waiting period in days before it can be executed
+        wait_period=sp.TNat,
         # The amount of DAO tokens to escrow to create a proposal
         escrow_amount=sp.TNat,
         # The percentage of positive votes needed to return the tokens in escrow
@@ -55,7 +61,7 @@ class DAOGovernance(sp.Contract):
         min_quorum=sp.TNat,
         # The maximum possible quorum value
         max_quorum=sp.TNat).layout(
-            ("vote_method", ("voting_period", ("escrow_amount", ("escrow_return", ("min_amount", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum"))))))))))))
+            ("vote_method", ("vote_period", ("wait_period", ("escrow_amount", ("escrow_return", ("min_amount", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum")))))))))))))
 
     MUTEZ_TRANSFERS_TYPE = sp.TList(sp.TRecord(
         # The amount of mutez to transfer
@@ -92,7 +98,8 @@ class DAOGovernance(sp.Contract):
     PROPOSAL_STATUS_TYPE = sp.TVariant(
         # The status for proposals that are open and can still be voted
         open=sp.TUnit,
-        # The status for proposals that has been cancelled by the proposal issuer
+        # The status for proposals that has been cancelled by the proposal
+        # issuer or the DAO guardians
         cancelled=sp.TUnit,
         # The status for proposals that have been approved but not yet executed
         approved=sp.TUnit,
@@ -168,8 +175,8 @@ class DAOGovernance(sp.Contract):
             amount=sp.TNat).layout(("to_", ("token_id", "amount"))))).layout(
                 ("from_", "txs")))
 
-    def __init__(self, metadata, treasury, token, representatives, quorum,
-                 governance_parameters):
+    def __init__(self, metadata, administrator, treasury, token,
+                 representatives, guardians, quorum, governance_parameters):
         """Initializes the contract.
 
         """
@@ -177,12 +184,16 @@ class DAOGovernance(sp.Contract):
         self.init_type(sp.TRecord(
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
+            # The DAO administrator contract address
+            administrator=sp.TAddress,
             # The DAO treasury contract address
             treasury=sp.TAddress,
             # The DAO token contract address
             token=sp.TAddress,
             # The community representatives contract address
             representatives=sp.TAddress,
+            # The DAO guardians contract address
+            guardians=sp.TAddress,
             # The minimum number of votes needed to approve proposals
             quorum=sp.TNat,
             # The last quorum update
@@ -203,9 +214,11 @@ class DAOGovernance(sp.Contract):
         # Initialize the contract storage
         self.init(
             metadata=metadata,
+            administrator=administrator,
             treasury=treasury,
             token=token,
             representatives=representatives,
+            guardians=guardians,
             quorum=quorum,
             last_quorum_update=sp.timestamp(0),
             governance_parameters=governance_parameters,
@@ -385,7 +398,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal voting period didn't expire
         end_date = proposal.timestamp.add_days(
-            sp.to_int(self.data.governance_parameters.voting_period))
+            sp.to_int(self.data.governance_parameters.vote_period))
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
         # Check that the member didn't vote the proposal before
@@ -409,6 +422,7 @@ class DAOGovernance(sp.Contract):
         weight = sp.local("weight", token_balance.value)
 
         with sp.if_(proposal.vote_method.is_variant("quadratic")):
+            # We divide the balance by 10000 to reduce the number of iterations
             weight.value = self.integer_square_root(token_balance.value // 10000)
 
         # Update the DAO token holders votes summary
@@ -450,7 +464,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal voting period didn't expire
         end_date = proposal.timestamp.add_days(
-            sp.to_int(self.data.governance_parameters.voting_period))
+            sp.to_int(self.data.governance_parameters.vote_period))
         sp.verify(sp.now < end_date, message="DAO_CLOSED_PROPOSAL")
 
         # Get the representative community
@@ -484,19 +498,25 @@ class DAOGovernance(sp.Contract):
         self.data.representatives_votes[vote_key] = params.vote
 
     @sp.entry_point
-    def cancel_proposal(self, proposal_id):
+    def cancel_proposal(self, params):
         """Cancels an open proposal.
 
         """
         # Define the input parameter data type
-        sp.set_type(proposal_id, sp.TNat)
+        sp.set_type(params, sp.TRecord(
+            proposal_id=sp.TNat,
+            return_escrow=sp.TBool).layout(
+                ("proposal_id", "return_escrow")))
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
-            proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
+            params.proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
 
-        # Check that the address that called the entry point is the proposal issuer
-        sp.verify(sp.sender == proposal.issuer, message="DAO_NOT_ISSUER")
+        # Check that the address that called the entry point is the proposal
+        # issuer or the DAO guardians
+        sp.verify((sp.sender == proposal.issuer) | 
+                  (sp.sender == self.data.guardians),
+                  message="DAO_NOT_ISSUER_OR_GUARDIANS")
 
         # Check that the proposal status is set as open or approved
         sp.verify(proposal.status.is_variant("open") | 
@@ -522,7 +542,7 @@ class DAOGovernance(sp.Contract):
 
             # Check which address should receive the DAO tokens
             receiver = sp.local("receiver", self.data.treasury)
-            return_escrow = positive > ((positive_and_negative * self.data.governance_parameters.escrow_return) // 100)
+            return_escrow = params.return_escrow & (positive > ((positive_and_negative * self.data.governance_parameters.escrow_return) // 100))
 
             with sp.if_(return_escrow):
                 receiver.value = proposal.issuer
@@ -535,7 +555,7 @@ class DAOGovernance(sp.Contract):
                 amount=proposal.escrow_amount))
 
         # Set the proposal status as cancelled
-        self.data.proposals[proposal_id].status = sp.variant("cancelled", sp.unit)
+        self.data.proposals[params.proposal_id].status = sp.variant("cancelled", sp.unit)
 
     @sp.entry_point
     def evaluate_voting_result(self, proposal_id):
@@ -558,7 +578,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal voting period has finished
         end_date = proposal.timestamp.add_days(
-            sp.to_int(self.data.governance_parameters.voting_period))
+            sp.to_int(self.data.governance_parameters.vote_period))
         sp.verify(sp.now > end_date, message="DAO_OPEN_PROPOSAL")
 
         # Make sure that we don't divide by zero in the next steps
@@ -657,6 +677,12 @@ class DAOGovernance(sp.Contract):
         sp.verify(proposal.status.is_variant("approved"),
                   message="DAO_STATUS_NOT_APPROVED")
 
+        # Check that the proposal wating period has finished
+        end_date = proposal.timestamp.add_days(sp.to_int(
+            self.data.governance_parameters.vote_period + 
+            self.data.governance_parameters.wait_period))
+        sp.verify(sp.now > end_date, message="DAO_WAITING_PROPOSAL")
+
         # Set the proposal status as executed
         self.data.proposals[proposal_id].status = sp.variant(
             "executed", sp.unit)
@@ -700,8 +726,10 @@ class DAOGovernance(sp.Contract):
         # Define the input parameter data type
         sp.set_type(new_treasury, sp.TAddress)
 
-        # Check that the DAO itself executed the entry point
-        sp.verify(sp.sender == sp.self_address, message="DAO_NOT_DAO")
+        # Check that the DAO or the DAO aministrator executed the entry point
+        sp.verify((sp.sender == sp.self_address) | 
+                  (sp.sender == self.data.administrator),
+                  message="DAO_NOT_DAO_OR_ADMIN")
 
         # Update the DAO treasury contract address
         self.data.treasury = new_treasury
@@ -723,6 +751,38 @@ class DAOGovernance(sp.Contract):
         self.data.representatives = new_representatives
 
     @sp.entry_point
+    def set_guardians(self, new_guardians):
+        """Updates the DAO guardians contract address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_guardians, sp.TAddress)
+
+        # Check that the DAO or the guardians executed the entry point
+        sp.verify((sp.sender == sp.self_address) | 
+                  (sp.sender == self.data.guardians),
+                  message="DAO_NOT_DAO_OR_GUARDIANS")
+
+        # Update the DAO guardians contract address
+        self.data.guardians = new_guardians
+
+    @sp.entry_point
+    def set_quorum(self, new_quorum):
+        """Updates the DAO quorum.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_quorum, sp.TNat)
+
+        # Check that the DAO or the DAO aministrator executed the entry point
+        sp.verify((sp.sender == sp.self_address) | 
+                  (sp.sender == self.data.administrator),
+                  message="DAO_NOT_DAO_OR_ADMIN")
+
+        # Update the DAO quorum parameter
+        self.data.quorum = new_quorum
+
+    @sp.entry_point
     def set_governance_parameters(self, new_governance_parameters):
         """Updates the DAO governance parameters.
 
@@ -731,8 +791,10 @@ class DAOGovernance(sp.Contract):
         sp.set_type(new_governance_parameters,
                     DAOGovernance.GOVERNANCE_PARAMETERS_TYPE)
 
-        # Check that the DAO itself executed the entry point
-        sp.verify(sp.sender == sp.self_address, message="DAO_NOT_DAO")
+        # Check that the DAO or the DAO aministrator executed the entry point
+        sp.verify((sp.sender == sp.self_address) | 
+                  (sp.sender == self.data.administrator),
+                  message="DAO_NOT_DAO_OR_ADMIN")
 
         # Update the governance parameters
         self.data.governance_parameters = new_governance_parameters
@@ -753,13 +815,16 @@ class DAOGovernance(sp.Contract):
 
 sp.add_compilation_target("dao", DAOGovernance(
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-    treasury=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa"),
-    token=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekbb"),
-    representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekcc"),
+    administrator=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa"),
+    treasury=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekbb"),
+    token=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekcc"),
+    representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekdd"),
+    guardians=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekee"),
     quorum=8000,
     governance_parameters=sp.record(
         vote_method=sp.variant("linear", sp.unit),
-        voting_period=5,
+        vote_period=5,
+        wait_period=2,
         escrow_amount=100,
         escrow_return=30,
         min_amount=1,
