@@ -1,2 +1,1 @@
- # package teia-sc
-#import error_collection
+# package teia-sc

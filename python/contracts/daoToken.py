@@ -47,11 +47,12 @@ class DAOToken(sp.Contract):
             ("level", "balance"))
 
     # Start a collection for smart contract errors
-    error_collection = ErrorCollection(__name__)
+    error_collection = ErrorCollection(__qualname__).inject(sp)
+
     # Set a shorthand wrapper function to reference and add error info.
     @staticmethod
-    def _add_error(*args, **kwargs): 
-        "Helper method to collect metadata for errors" 
+    def _add_error(*args, **kwargs):
+        "Helper method to collect metadata for errors"
         # All failwith errors return the same type for this contract:
         kwargs.update(failwith_type='string', expansion_type='string')
         return DAOToken.error_collection.add_error(*args, **kwargs)
@@ -106,36 +107,35 @@ class DAOToken(sp.Contract):
             proposed_administrator=sp.none)
 
         # A function handle to wrap calls to error_collection.add_error()
-        global ERR
-        ERR = DAOToken._add_error
+        add_error = DAOToken._add_error
 
         # Contract error codes, messages for expansion and documentation.
-        ERR(        "FA2_NOT_ADMIN", 
+        add_error("FA2_NOT_ADMIN",
          expansion = "The caller must be the contract administrator.",
          doc       = """Only the contract administrator can perform these operations:
 mint, transfer_administrator, set_metadata, add_max_share_exception""")
-        ERR("FA2_NOT_OPERATOR",
+        add_error("FA2_NOT_OPERATOR",
           expansion="",
           )
-        ERR("FA2_SENDER_IS_NOT_OWNER",
+        add_error("FA2_SENDER_IS_NOT_OWNER",
           expansion="",
           )
-        ERR("FA2_SHARE_EXCESS",
+        add_error("FA2_SHARE_EXCESS",
           expansion="",
           )
-        ERR("FA2_SUPPLY_EXCEEDED",
+        add_error("FA2_SUPPLY_EXCEEDED",
           expansion="",
           )
-        ERR("FA2_TOKEN_UNDEFINED",
+        add_error("FA2_TOKEN_UNDEFINED",
           expansion="",
           )
-        ERR("FA2_WRONG_LEVEL",
+        add_error("FA2_WRONG_LEVEL",
           expansion="",
           )
-        ERR("FA2_WRONG_MAX_CHECKPOINTS",
+        add_error("FA2_WRONG_MAX_CHECKPOINTS",
           expansion="",
           )
-        ERR("FA_NOT_PROPOSED_ADMIN",
+        add_error("FA_NOT_PROPOSED_ADMIN",
           expansion="",
           )
 
@@ -175,14 +175,14 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
         administrator.
 
         """
-        sp.verify(sp.sender == self.data.administrator, message=ERR("FA2_NOT_ADMIN"))
+        sp.verify(sp.sender == self.data.administrator, message="FA2_NOT_ADMIN")
 
     @sp.private_lambda(with_storage=None, wrap_call=True)
     def check_token_exists(self, token_id):
         """Checks that the given token exists.
 
         """
-        sp.verify(token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
+        sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
     @sp.private_lambda(with_storage="read-write", wrap_call=True)
     def add_checkpoint(self, owner):
@@ -246,11 +246,11 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
             # Check that the balance is lower than the maximum share
             sp.verify(self.data.max_share_exceptions.contains(mint.to_) |
                       (self.data.ledger[mint.to_] < self.data.max_share),
-                      message=ERR("FA2_SHARE_EXCESS"))
+                      message="FA2_SHARE_EXCESS")
 
             # Check that the total supply is not larger than the maximum supply
             sp.verify(self.data.supply <= self.data.max_supply,
-                      message=ERR("FA2_SUPPLY_EXCEEDED"))
+                      message="FA2_SUPPLY_EXCEEDED")
 
             # Add a balance checkpoint
             self.add_checkpoint(mint.to_)
@@ -284,7 +284,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
                         owner=owner,
                         operator=sp.sender,
                         token_id=0)),
-                    message=ERR("FA2_NOT_OPERATOR"))
+                    message="FA2_NOT_OPERATOR")
 
                 # Check that the transfer amount is not zero
                 with sp.if_(tx.amount > 0):
@@ -300,7 +300,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
                     # Check that the balance is lower than the maximum share
                     sp.verify(self.data.max_share_exceptions.contains(tx.to_) |
                               (self.data.ledger[tx.to_] < self.data.max_share),
-                              message=ERR("FA2_SHARE_EXCESS"))
+                              message="FA2_SHARE_EXCESS")
 
                     # Add the new balance checkpoints
                     self.add_checkpoint(owner)
@@ -353,7 +353,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
 
                     # Check that the sender is the token owner
                     sp.verify(sp.sender == operator_key.owner,
-                              message=ERR("FA2_SENDER_IS_NOT_OWNER"))
+                              message="FA2_SENDER_IS_NOT_OWNER")
 
                     # Add the new operator to the operators big map
                     self.data.operators[operator_key] = sp.unit
@@ -363,7 +363,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
 
                     # Check that the sender is the token owner
                     sp.verify(sp.sender == operator_key.owner,
-                              message=ERR("FA2_SENDER_IS_NOT_OWNER"))
+                              message="FA2_SENDER_IS_NOT_OWNER")
 
                     # Remove the operator from the operators big map
                     del self.data.operators[operator_key]
@@ -390,7 +390,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            "FA_NO_NEW_ADMIN"), message=ERR("FA_NOT_PROPOSED_ADMIN"))
+            "FA_NO_NEW_ADMIN"), message="FA_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender
@@ -441,12 +441,12 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
             max_checkpoints=sp.TOption(sp.TNat)).layout(("owner", ("level", "max_checkpoints"))))
 
         # Check that the requested level is smaller than the current level
-        sp.verify(params.level < sp.level, message=ERR("FA2_WRONG_LEVEL"))
+        sp.verify(params.level < sp.level, message="FA2_WRONG_LEVEL")
 
         # Check that, if defined, max checkpoints is larger than zero
         sp.verify(~params.max_checkpoints.is_some() |
                   (params.max_checkpoints.open_some() > 0),
-                  message=ERR("FA2_WRONG_MAX_CHECKPOINTS"))
+                  message="FA2_WRONG_MAX_CHECKPOINTS")
 
         # Check if the owner has any checkpoints
         with sp.if_(~self.data.n_checkpoints.contains(params.owner)):
@@ -493,7 +493,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
             token_id=sp.TNat).layout(("owner", "token_id")))
 
         # Check that the token exists
-        sp.verify(params.token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
+        sp.verify(params.token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
         # Return the owner token balance
         sp.result(self.data.ledger.get(params.owner, 0))
@@ -507,7 +507,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
         sp.set_type(token_id, sp.TNat)
 
         # Check that the token exists
-        sp.verify(token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
+        sp.verify(token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
         # Return the token total supply
         sp.result(self.data.supply)
@@ -528,7 +528,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
         sp.set_type(params, DAOToken.OPERATOR_KEY_TYPE)
 
         # Check that the token exists
-        sp.verify(params.token_id == 0, message=ERR("FA2_TOKEN_UNDEFINED"))
+        sp.verify(params.token_id == 0, message="FA2_TOKEN_UNDEFINED")
 
         # Return true if the token operator exists
         sp.result(self.data.operators.contains(params))
@@ -543,7 +543,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
 
         # Return the token metadata
         sp.result(self.data.token_metadata.get(
-            token_id, message=ERR("FA2_TOKEN_UNDEFINED")))
+            token_id, message="FA2_TOKEN_UNDEFINED"))
 
 
 
