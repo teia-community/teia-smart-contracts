@@ -1,0 +1,23 @@
+{
+    "name": "Teia DAO treasury prototype",
+    "description": "The Teia DAO treasury where the Teia community tez and DAO tokens are stored",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy 0.10.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoTreasury.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "TREASURY_NOT_DAO"}, 
+            "expansion": { "string": "The account that executed the entry point is not the DAO contract"},
+            "languages": ["en"] 
+        }
+    ]
+}
