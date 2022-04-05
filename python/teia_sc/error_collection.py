@@ -1,16 +1,20 @@
 """A helper module to manage tezos smart contract errors for TZIP-16 metadata.
 """
-
+from __future__ import annotations
 from collections import defaultdict
 from html import escape
 from re import match
 
 # TODO's :
-#  add support for multiple languages in errors
+#  Add support for multiple languages in errors.
+#  Look at Michelson return types in TZIP-16 standard,
+#    - How to specify properly
+#    - How to leverage smartpy for the return values
 
 # The follwing stores information collected on the various contracts
 contracts = defaultdict(lambda:defaultdict(lambda:defaultdict(dict)))
 
+# Keyword arguments that can be supplied to ErrorCollector.add_tzip16_error():
 ALLOWED_ERROR_DATA_KEYS = [
     'failwith_type',  # Return type from `FAILWITH` instruction. Always represented as string.
     'expansion',      # Required for TZIP-16 expansion metadata
@@ -18,11 +22,13 @@ ALLOWED_ERROR_DATA_KEYS = [
     'doc',            # For extended documentation/tips for dealing with some errors. Optional.
     ]
 
+# Allowed values for failwith_type and expansion_type.
 ALLOWED_ERROR_MESSAGE_TYPES = [
     'string',
     'bytes',
     ]
 
+# Default settings for
 _TestError_default_flags = dict(
     WARN_LONG_KEY = True,
     LONG_KEY_THRESHOLD = 8,
@@ -31,21 +37,23 @@ _TestError_default_flags = dict(
     )
 
 class SimpleTestMessageCollector():
-    "Simple class to collect and sort verification messages"
-    def __init__(self):
+    "Simple class to collect and sort verification messages according to severity"
+    def __init__(self) -> None:
         self.warnings = []
         self.errors = []
         self.infos = []
-    def append(self, severity, message):
+    def append(self, severity, message) -> None:
         "Append message of severity 'INFO', 'WARN' or 'ERROR'."
         if severity=='INFO':
             self.infos.append(message)
-        if severity=='WARN':
+        elif severity=='WARN':
             self.warnings.append(message)
-        if severity=='ERROR':
+        elif severity=='ERROR':
             self.errors.append(message)
-    def to_dict(self):
-        "Return instance variables as dict"
+        else:
+            raise ValueError("Severity not one of 'INFO', 'WARN', 'ERROR'.")
+    def to_dict(self) -> dict:
+        "Return dict with infos, warnings, messages."
         return { 'infos':self.infos, 'warnings':self.warnings, 'errors':self.errors, }
 
 
@@ -57,26 +65,31 @@ class ErrorCollection():
     # Whether to add "ERROR_MISSING_*" strings for missing metadata fields.
     # This is currently required to avoid runtime errors.
     TZIP16_POPULATE_MISSING_KEYS = True
+    SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS = True
     SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS_STDOUT = True
 
     def __init__(self, contract_name) -> None:
         self.contract = contracts[contract_name]
         self.contract_name = contract_name
         self.error_collection = self.contract['error_messages']
-        self.flags = _TestError_default_flags
+        self.flags = _TestError_default_flags.copy()
 
-    def inject(self, sp):
-        "Code to add wrappers to SmartPy functions deal with contract failure results."
+    def inject_into_smartpy(self, sp) -> ErrorCollection:
+        """Adds wrappers into SmartPy functions to gather contract failure messages.
+
+        :param sp: The smartpy module to inject into.
+        :type sp: module
+        """
         # Wrapped functions have exact arguments replicated to hopefully
-        # Cause errors if smartpy changes their interface.
+        # cause errors if smartpy changes the interface at some point.
         if 'injected_error_collection' in dir(sp):
             raise NotImplementedError("TODO: Removal and re-injection of smartpy wrappers for ErrorCollection.")
-        # Wrap sp.verify
-        sp.wrap_verify_messages = self.add_error
+        # Wrap messages in sp.verify using ready-made functionality
+        sp.wrap_verify_messages = self.add_sc_error_ref
         # Wrap sp.failwith
         def wrapped_failwith(failwith):
             def failwith_wrapper(message):
-                self.add_error(message)
+                self.add_sc_error_ref(message)
                 return failwith(message)
             return failwith_wrapper
         sp.failwith = wrapped_failwith(sp.failwith)
@@ -84,7 +97,7 @@ class ErrorCollection():
         def wrapped_open_variant(open_variant):
             def open_variant_wrapper(_self, name, message = None):
                 if message is not None:
-                    self.add_error(message)
+                    self.add_sc_error_ref(message)
                 return open_variant(_self, name, message=message)
             return open_variant_wrapper
         sp.Expr.open_variant = wrapped_open_variant(sp.Expr.open_variant)
@@ -93,12 +106,34 @@ class ErrorCollection():
         # Return self for use with instantiation
         return self
 
-    def add_error(self, error_code, **kwargs) -> str:
-        "Add error and check input, possible kwargs in ALLOWED_ERROR_DATA_KEYS"
+    def add_sc_error_ref(self, error_code):
+        "Marks presence of error"
         # These are false positives:
         if match(r"View \w+ is invalid!", error_code):
             return
+        # Record the reference
+        self.error_collection[error_code] # pylint: disable=pointless-statement
+        return error_code
 
+    def add_error(self, error_code, **kwargs) -> None:
+        "Add error"
+        errors = self.error_collection
+        error = errors[error_code]
+        if 'allow_updates' not in kwargs or not kwargs['allow_updates']:
+            # Check for redefinitions and disallow changes in this method:
+            kwargs.pop('allow_updates')
+            for key, item in kwargs.items():
+                if (key in error) and (error[key]!=item):
+                    raise AttributeError(f"Redefining '{key}' with new value is not allowed, use TODO to update")
+        # Put stuff into error
+        error.update(kwargs)
+
+    def add_or_update_error(self, error_code, **kwargs) -> None:
+        "Add or update error"
+        self.error_collection[error_code].update(kwargs)
+
+    def add_tzip16_error(self, error_code, **kwargs) -> None:
+        "Add error and check input, possible kwargs in ALLOWED_ERROR_DATA_KEYS"
         errors = self.error_collection
         error = errors[error_code]
         # Check for redefinitions and disallow changes in this method:
@@ -115,7 +150,7 @@ class ErrorCollection():
     def verify_error_collection(self, **kwargs) -> SimpleTestMessageCollector:
         "Verifies that all errors pass a set of tests."
         # The optional parameters flags dict can be used to adjust flags by caller.
-        test_params = _TestError_default_flags.copy()
+        test_params = self.flags.copy()
         if 'flags' in kwargs:
             test_params.update(kwargs['flags'])
 
@@ -148,12 +183,12 @@ class ErrorCollection():
 
         return messages
 
-    def tzip16_metadata(self):
+    def tzip16_metadata(self) -> list(dict):
         "Return a list with error code and expansion, suitable for adding to the metadata. (Follows TZIP-16)"
         def tzip16_error(code, failwith_type, expansion, expansion_type):
             return dict(
-                error     = {failwith_type: code},   # Content should be a Michelson expression (TZIP-16), TODO add test?
-                expansion = {expansion_type: expansion}, # Content should be a Michelson expression (TZIP-16), TODO add test?
+                error     = {failwith_type: code},       # Content should be a Michelson expression (TZIP-16), TODO investigate
+                expansion = {expansion_type: expansion}, # Content should be a Michelson expression (TZIP-16), TODO investigate
                 languages = ["en"],
                 )
         for key, item in self.error_collection.items():
@@ -172,7 +207,7 @@ class ErrorCollection():
 
         return [tzip16_error(key,item['failwith_type'],item['expansion'],item['expansion_type']) for key, item in self.error_collection.items()]
 
-    def scenario_linting_report(self, scenario):
+    def scenario_linting_report(self, scenario) -> None:
         "Output a SmartPy test report."
         results = self.verify_error_collection()
         scenario.h2("FAILWITH Linting report.")
@@ -192,14 +227,10 @@ class ErrorCollection():
             _ = self.tzip16_metadata()
             if ErrorCollection.SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS_STDOUT:
                 print("*** (help) Function calls to add metadata to contract and ErrorCollector:\n")
-                print("# A function handle to call the contract's error_collection.add_error()")
-                print("add_error = DAOToken.error_collector.add_error")
-                print("# An add_error method for each error encountered in the contract:")
-                print("\n".join( [f"add_error(\"{key}\","
-                     +"\n          " +"\n          ".join(
-                      [f"{item_key} = \"{item_value}\"," for item_key, item_value in item.items()]) + ")"
+                print("# A function handle to call the contract's error_collection.add_tzip16_error()")
+                print(f"tzip16_error = {self.contract_name}.error_collection.add_tzip16_error")
+                print("# A tzip16_error method for each error encountered in the contract:")
+                print("\n".join( [f"tzip16_error(\"{key}\","
+                     +"\n  " +"\n  ".join(
+                         [f"{item_key:18} = \"{item_value}\"," for item_key, item_value in item.items()]) + ")"
                      for key, item in self.error_collection.items()]))
-
-
-    # Convenience aliases:
-    ERR=add_error

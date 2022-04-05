@@ -51,11 +51,11 @@ class DAOToken(sp.Contract):
 
     # Set a shorthand wrapper function to reference and add error info.
     @staticmethod
-    def _add_error(*args, **kwargs):
+    def _tzip16_error(*args, **kwargs):
         "Helper method to collect metadata for errors"
         # All failwith errors return the same type for this contract:
         kwargs.update(failwith_type='string', expansion_type='string')
-        return DAOToken.error_collection.add_error(*args, **kwargs)
+        return DAOToken.error_collection.add_tzip16_error(*args, **kwargs)
 
     def __init__(self, administrator, metadata, token_metadata, max_supply, max_share):
         """Initializes the contract.
@@ -106,36 +106,36 @@ class DAOToken(sp.Contract):
             max_share_exceptions=sp.set([]),
             proposed_administrator=sp.none)
 
-        # A function handle to wrap calls to error_collection.add_error()
-        add_error = DAOToken._add_error
+        # A function handle to wrap calls to error_collection.add_tzip16_error()
+        tzip16_error = DAOToken._tzip16_error
 
-        # Contract error codes, messages for expansion and documentation.
-        add_error("FA2_NOT_ADMIN",
+        # Contract error codes, messages for wallet expansion and documentation.
+        tzip16_error("FA2_NOT_ADMIN",
          expansion = "The caller must be the contract administrator.",
          doc       = """Only the contract administrator can perform these operations:
 mint, transfer_administrator, set_metadata, add_max_share_exception""")
-        add_error("FA2_NOT_OPERATOR",
+        tzip16_error("FA2_NOT_OPERATOR",
           expansion="",
           )
-        add_error("FA2_SENDER_IS_NOT_OWNER",
+        tzip16_error("FA2_SENDER_IS_NOT_OWNER",
           expansion="",
           )
-        add_error("FA2_SHARE_EXCESS",
+        tzip16_error("FA2_SHARE_EXCESS",
           expansion="",
           )
-        add_error("FA2_SUPPLY_EXCEEDED",
+        tzip16_error("FA2_SUPPLY_EXCEEDED",
           expansion="",
           )
-        add_error("FA2_TOKEN_UNDEFINED",
+        tzip16_error("FA2_TOKEN_UNDEFINED",
           expansion="",
           )
-        add_error("FA2_WRONG_LEVEL",
+        tzip16_error("FA2_WRONG_LEVEL",
           expansion="",
           )
-        add_error("FA2_WRONG_MAX_CHECKPOINTS",
+        tzip16_error("FA2_WRONG_MAX_CHECKPOINTS",
           expansion="",
           )
-        add_error("FA_NOT_PROPOSED_ADMIN",
+        tzip16_error("FA_NOT_PROPOSED_ADMIN",
           expansion="",
           )
 
