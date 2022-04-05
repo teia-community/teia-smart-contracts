@@ -47,7 +47,7 @@ class DAOToken(sp.Contract):
             ("level", "balance"))
 
     # Start a collection for smart contract errors
-    error_collection = ErrorCollection(__qualname__).inject(sp)
+    error_collection = ErrorCollection(__qualname__).inject_into_smartpy(sp)
 
     # Set a shorthand wrapper function to reference and add error info.
     @staticmethod

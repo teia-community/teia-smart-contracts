@@ -1256,3 +1256,9 @@ def test_quadratic_voting():
     scenario.verify(dao.data.token_votes[(0, user4.address)].weight == int(pow(400 * 100, 0.5)))
     scenario.verify(dao.data.token_votes[(0, user5.address)].vote.is_variant("no"))
     scenario.verify(dao.data.token_votes[(0, user5.address)].weight == int(pow(5 * 100, 0.5)))
+
+@sp.add_test(name="Lint FAILWITH messages")
+def test_error_message_rules():
+    scenario = sp.test_scenario()
+    daoGovernanceModule.DAOGovernance.error_collection.scenario_linting_report(scenario)
+

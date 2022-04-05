@@ -1,9 +1,8 @@
-"""A helper module to manage tezos smart contract errors for TZIP-16 metadata.
-"""
 from __future__ import annotations
 from collections import defaultdict
 from html import escape
 from re import match
+from inspect import stack
 
 # TODO's :
 #  Add support for multiple languages in errors.
@@ -56,6 +55,26 @@ class SimpleTestMessageCollector():
         "Return dict with infos, warnings, messages."
         return { 'infos':self.infos, 'warnings':self.warnings, 'errors':self.errors, }
 
+def _add_sc_error_ref(error_code):
+    "Marks presence of error"
+    # These are false positives:
+    if match(r"View \w+ is invalid!", error_code):
+        return
+    def get_contract_caller():
+        # Traverse stack to check who the caller was
+        for line in stack():
+            if 'self' in line[0].f_locals:
+                cn = line[0].f_locals['self'].__class__.__name__
+                global contracts
+                if cn in contracts:
+                    return cn
+        return None, None
+    contract_name = get_contract_caller()
+    if contract_name:
+        # Record the reference
+        global contracts
+        contracts[contract_name]['error_collection'][error_code].update({})
+    return error_code
 
 class ErrorCollection():
     "For collecting contract error messages, to provide them for metadata and documentation."
@@ -69,9 +88,10 @@ class ErrorCollection():
     SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS_STDOUT = True
 
     def __init__(self, contract_name) -> None:
+        global contracts
         self.contract = contracts[contract_name]
         self.contract_name = contract_name
-        self.error_collection = self.contract['error_messages']
+        self.error_collection = self.contract['error_collection']
         self.flags = _TestError_default_flags.copy()
 
     def inject_into_smartpy(self, sp) -> ErrorCollection:
@@ -83,13 +103,13 @@ class ErrorCollection():
         # Wrapped functions have exact arguments replicated to hopefully
         # cause errors if smartpy changes the interface at some point.
         if 'injected_error_collection' in dir(sp):
-            raise NotImplementedError("TODO: Removal and re-injection of smartpy wrappers for ErrorCollection.")
+            return self
         # Wrap messages in sp.verify using ready-made functionality
-        sp.wrap_verify_messages = self.add_sc_error_ref
+        sp.wrap_verify_messages = _add_sc_error_ref
         # Wrap sp.failwith
         def wrapped_failwith(failwith):
             def failwith_wrapper(message):
-                self.add_sc_error_ref(message)
+                _add_sc_error_ref(message)
                 return failwith(message)
             return failwith_wrapper
         sp.failwith = wrapped_failwith(sp.failwith)
@@ -97,7 +117,7 @@ class ErrorCollection():
         def wrapped_open_variant(open_variant):
             def open_variant_wrapper(_self, name, message = None):
                 if message is not None:
-                    self.add_sc_error_ref(message)
+                    _add_sc_error_ref(message)
                 return open_variant(_self, name, message=message)
             return open_variant_wrapper
         sp.Expr.open_variant = wrapped_open_variant(sp.Expr.open_variant)
@@ -106,14 +126,6 @@ class ErrorCollection():
         # Return self for use with instantiation
         return self
 
-    def add_sc_error_ref(self, error_code):
-        "Marks presence of error"
-        # These are false positives:
-        if match(r"View \w+ is invalid!", error_code):
-            return
-        # Record the reference
-        self.error_collection[error_code] # pylint: disable=pointless-statement
-        return error_code
 
     def add_error(self, error_code, **kwargs) -> None:
         "Add error"
@@ -156,10 +168,10 @@ class ErrorCollection():
 
         # Tests on error data, to go through:
         all_tests = dict(
-            LONG_CODE        = 'WARN',
-            NO_MESSAGE       = 'ERROR',
-            NO_MESSAGE_TYPE  = 'WARN',
-            NO_FAILWITH_TYPE = 'ERROR',
+            LONG_CODE         = 'WARN',
+            NO_EXPANSION      = 'ERROR',
+            NO_EXPANSION_TYPE = 'ERROR',
+            NO_FAILWITH_TYPE  = 'ERROR',
             )
 
         # Somewhere to collect messages:
@@ -171,10 +183,10 @@ class ErrorCollection():
                 if test=='LONG_CODE':
                     if len(error_key)>test_params['LONG_KEY_THRESHOLD']:
                         messages.append(severity, f"Error code \"{error_key}\" longer than {test_params['LONG_KEY_THRESHOLD']} characters.")
-                if test=='NO_MESSAGE':
+                if test=='NO_EXPANSION':
                     if 'expansion' not in error_item or not error_item['expansion']:
                         messages.append(severity, f"Error {error_key} 'expansion' attribute is not present or empty.")
-                if test=='NO_MESSAGE_TYPE':
+                if test=='NO_EXPANSION_TYPE':
                     if 'expansion_type' not in error_item:
                         messages.append(severity, f"Error {error_key} 'expansion_type' attribute is not present or empty.")
                 if test=='NO_FAILWITH_TYPE':
@@ -183,7 +195,7 @@ class ErrorCollection():
 
         return messages
 
-    def tzip16_metadata(self) -> list(dict):
+    def tzip16_metadata(self, populate_missing_keys = True ) -> list(dict):
         "Return a list with error code and expansion, suitable for adding to the metadata. (Follows TZIP-16)"
         def tzip16_error(code, failwith_type, expansion, expansion_type):
             return dict(
@@ -197,20 +209,31 @@ class ErrorCollection():
                 print(f"TZIP-16 Non-compliance in {key} : {item}\n{message}")
                 if ErrorCollection.TZIP16_NONCOMPLIANCE_RAISE_ERROR:
                     raise AttributeError(message)
-            if ErrorCollection.TZIP16_POPULATE_MISSING_KEYS:
+            if populate_missing_keys and ErrorCollection.TZIP16_POPULATE_MISSING_KEYS:
                 if not 'failwith_type' in item:
                     item['failwith_type'] = 'ERROR_MISSING_TYPE'
                 if not 'expansion' in item:
                     item['expansion'] = 'ERROR_MISSING_EXPANSION'
                 if not 'expansion_type' in item:
                     item['expansion_type'] = 'ERROR_MISSING_EXPANSION_TYPE'
+            else:
+                if not 'failwith_type' in item:
+                    item['failwith_type'] = ''
+                if not 'expansion' in item:
+                    item['expansion'] = ''
+                if not 'expansion_type' in item:
+                    item['expansion_type'] = ''
 
         return [tzip16_error(key,item['failwith_type'],item['expansion'],item['expansion_type']) for key, item in self.error_collection.items()]
 
     def scenario_linting_report(self, scenario) -> None:
         "Output a SmartPy test report."
+        if ErrorCollection.SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS_STDOUT:
+            sprint = lambda x: [scenario.p("<pre><code>"+x+"</code></pre>"), print(x)]
+        else:
+            sprint = lambda x: scenario.p("<pre><code>"+x+"</code></pre>")
         results = self.verify_error_collection()
-        scenario.h2("FAILWITH Linting report.")
+        scenario.h2(f"FAILWITH Linting report for {self.contract_name}.")
         if results.errors:
             scenario.h3(f"Errors ({len(results.errors)})")
             scenario.p("<br>".join([escape(str(e)) for e in results.errors]))
@@ -225,12 +248,17 @@ class ErrorCollection():
             print("*** TZIP-16 Metadata linting report for contract call errors.")
             print(f"*** {self.contract_name}: {len(results.errors)} errors and {len(results.warnings)} warnings.")
             _ = self.tzip16_metadata()
-            if ErrorCollection.SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS_STDOUT:
-                print("*** (help) Function calls to add metadata to contract and ErrorCollector:\n")
-                print("# A function handle to call the contract's error_collection.add_tzip16_error()")
-                print(f"tzip16_error = {self.contract_name}.error_collection.add_tzip16_error")
-                print("# A tzip16_error method for each error encountered in the contract:")
-                print("\n".join( [f"tzip16_error(\"{key}\","
+
+            if ErrorCollection.SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS:
+                scenario.h3(msg:="*** Helpful snippet to add error metadata to contract:")
+                if ErrorCollection.SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS_STDOUT:
+                    print(msg)
+                sprint(f"## The following lines would be added in {self.contract_name} class:\n"
+                   "# A function handle to call the contract's error_collection.add_tzip16_error()\n"
+                 + f"tzip16_error = {self.contract_name}.error_collection.add_tzip16_error\n\n"
+                 + f"## The following lines would be added in {self.contract_name}.__init__():\n"
+                 + "# A tzip16_error() call for each error encountered in the contract:\n"
+                 + "\n".join( [f"tzip16_error(\"{key}\","
                      +"\n  " +"\n  ".join(
                          [f"{item_key:18} = \"{item_value}\"," for item_key, item_value in item.items()]) + ")"
                      for key, item in self.error_collection.items()]))
