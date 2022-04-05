@@ -1,6 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from html import escape
+from json import dumps
 from re import match
 from inspect import stack
 
@@ -244,10 +245,10 @@ class ErrorCollection():
             scenario.h3("Infos")
             scenario.p("<br>".join([escape(str(e)) for e in results.infos]))
 
+        tzip_dict = self.tzip16_metadata()
         if results.errors or results.warnings:
             print("*** TZIP-16 Metadata linting report for contract call errors.")
             print(f"*** {self.contract_name}: {len(results.errors)} errors and {len(results.warnings)} warnings.")
-            _ = self.tzip16_metadata()
 
             if ErrorCollection.SCENARIO_LINTING_REPORT_PROVIDE_ADDERROR_CALLS:
                 scenario.h3(msg:="*** Helpful snippet to add error metadata to contract:")
@@ -262,3 +263,7 @@ class ErrorCollection():
                      +"\n  " +"\n  ".join(
                          [f"{item_key:18} = \"{item_value}\"," for item_key, item_value in item.items()]) + ")"
                      for key, item in self.error_collection.items()]))
+
+        scenario.h3("JSON for error metadata")
+        scenario.p("<pre><code>"+dumps(tzip_dict, indent = 2)+"</pre></code>")
+
