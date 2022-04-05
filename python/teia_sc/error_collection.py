@@ -28,6 +28,13 @@ ALLOWED_ERROR_MESSAGE_TYPES = [
     'bytes',
     ]
 
+# Module option to block smartpy injection. This will cause there to be no
+# discovery of smart contract errors (through tests). It may be useful as a
+# switch to turn off that function without touching the contract code.
+# Not so useful today, but perhaps in the future if ever the case arises
+# where the injection has an undesirable effect on smartpy.
+BLOCK_SMARTPY_INJECTION = False
+
 # Default settings for
 _TestError_default_flags = dict(
     WARN_LONG_KEY = True,
@@ -104,6 +111,8 @@ class ErrorCollection():
         # Wrapped functions have exact arguments replicated to hopefully
         # cause errors if smartpy changes the interface at some point.
         if 'injected_error_collection' in dir(sp):
+            return self
+        if BLOCK_SMARTPY_INJECTION:
             return self
         # Wrap messages in sp.verify using ready-made functionality
         sp.wrap_verify_messages = _add_sc_error_ref
