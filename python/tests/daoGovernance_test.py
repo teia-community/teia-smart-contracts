@@ -192,6 +192,7 @@ def test_text_proposal():
     scenario.verify(dao.data.guardians == guardians.address)
     scenario.verify(dao.data.quorum == 800)
     scenario.verify(dao.data.last_quorum_update == sp.timestamp(0))
+    scenario.verify(dao.data.gp_counter == 1)
     scenario.verify(dao.data.counter == 0)
 
     # Check that non-DAO members cannot create proposals
@@ -225,7 +226,8 @@ def test_text_proposal():
     scenario.verify(dao.data.proposals[0].issuer == user4.address)
     scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
     scenario.verify(dao.data.proposals[0].level == 10)
-    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].quorum == dao.data.quorum)
+    scenario.verify(dao.data.proposals[0].gp_index == 0)
     scenario.verify(dao.data.proposals[0].status.is_variant("open"))
     scenario.verify(dao.data.counter == 1)
 
@@ -400,8 +402,10 @@ def test_transfer_mutez_proposal():
     scenario.verify(dao.data.proposals[0].issuer == user4.address)
     scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
     scenario.verify(dao.data.proposals[0].level == 10)
-    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].quorum == dao.data.quorum)
+    scenario.verify(dao.data.proposals[0].gp_index == 0)
     scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.gp_counter == 1)
     scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
@@ -485,8 +489,10 @@ def test_transfer_token_proposal():
     scenario.verify(dao.data.proposals[0].issuer == user4.address)
     scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
     scenario.verify(dao.data.proposals[0].level == 10)
-    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].quorum == dao.data.quorum)
+    scenario.verify(dao.data.proposals[0].gp_index == 0)
     scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.gp_counter == 1)
     scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
@@ -571,8 +577,10 @@ def test_lambda_function_proposal():
     scenario.verify(dao.data.proposals[0].issuer == user4.address)
     scenario.verify(dao.data.proposals[0].timestamp == sp.timestamp(100))
     scenario.verify(dao.data.proposals[0].level == 10)
-    scenario.verify(dao.data.proposals[0].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[0].quorum == dao.data.quorum)
+    scenario.verify(dao.data.proposals[0].gp_index == 0)
     scenario.verify(dao.data.proposals[0].status.is_variant("open"))
+    scenario.verify(dao.data.gp_counter == 1)
     scenario.verify(dao.data.counter == 1)
 
     # Check that the tokens in escrow have been transferred
@@ -654,8 +662,10 @@ def test_lambda_function_proposal():
     scenario.verify(dao.data.proposals[1].issuer == user1.address)
     scenario.verify(dao.data.proposals[1].timestamp == sp.timestamp(500))
     scenario.verify(dao.data.proposals[1].level == 50)
-    scenario.verify(dao.data.proposals[1].escrow_amount == 10)
+    scenario.verify(dao.data.proposals[1].quorum == dao.data.quorum)
+    scenario.verify(dao.data.proposals[1].gp_index == 0)
     scenario.verify(dao.data.proposals[1].status.is_variant("open"))
+    scenario.verify(dao.data.gp_counter == 1)
     scenario.verify(dao.data.counter == 2)
 
     # Check that the tokens in escrow have been transferred
@@ -694,8 +704,8 @@ def test_lambda_function_proposal():
     scenario.verify(dao.data.proposals[1].status.is_variant("executed"))
 
     # Check that the DAO governance parameters has been updated
-    scenario.verify(dao.data.governance_parameters.escrow_amount == 20)
-    scenario.verify(dao.data.governance_parameters.min_amount == 6)
+    scenario.verify(dao.data.governance_parameters[1].escrow_amount == 20)
+    scenario.verify(dao.data.governance_parameters[1].min_amount == 6)
 
     # Create a new representatives account
     new_representatives = sp.test_account("new_representatives")
@@ -725,8 +735,10 @@ def test_lambda_function_proposal():
     scenario.verify(dao.data.proposals[2].issuer == user2.address)
     scenario.verify(dao.data.proposals[2].timestamp == sp.timestamp(1000))
     scenario.verify(dao.data.proposals[2].level == 100)
-    scenario.verify(dao.data.proposals[2].escrow_amount == 20)
+    scenario.verify(dao.data.proposals[2].quorum == dao.data.quorum)
+    scenario.verify(dao.data.proposals[2].gp_index == 1)
     scenario.verify(dao.data.proposals[2].status.is_variant("open"))
+    scenario.verify(dao.data.gp_counter == 2)
     scenario.verify(dao.data.counter == 3)
 
     # Check that the tokens in escrow have been transferred
