@@ -423,7 +423,7 @@ class DAOGovernance(sp.Contract):
 
         with sp.if_(proposal.vote_method.is_variant("quadratic")):
             # We divide the balance by 10000 to reduce the number of iterations
-            weight.value = self.integer_square_root(token_balance.value // 10000)
+            weight.value = 100 * self.integer_square_root(token_balance.value // 10000)
 
         # Update the DAO token holders votes summary
         new_votes = sp.local("new_votes", proposal.token_votes)
