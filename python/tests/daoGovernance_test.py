@@ -1194,8 +1194,9 @@ def test_integer_square_root():
 @sp.add_test(name="Test quadratic voting")
 def test_quadratic_voting():
     # Get the test environment
+    decimals = 1000000
     testEnvironment = get_test_environment(
-        vote_weight_mode="quadratic", decimals=1000000)
+        vote_weight_mode="quadratic", decimals=decimals)
     scenario = testEnvironment["scenario"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
@@ -1243,22 +1244,22 @@ def test_quadratic_voting():
         sender=user5, now=sp.timestamp(400), level=40)
 
     # Check that the contract information has been updated
-    scenario.verify(dao.data.proposals[0].token_votes.total == int(pow(300 * 100, 0.5)) + int(pow(400 * 100, 0.5)) + int(pow(5 * 100, 0.5)))
-    scenario.verify(dao.data.proposals[0].token_votes.positive == int(pow(300 * 100, 0.5)) + int(pow(400 * 100, 0.5)))
-    scenario.verify(dao.data.proposals[0].token_votes.negative == int(pow(5 * 100, 0.5)))
+    scenario.verify(dao.data.proposals[0].token_votes.total == 100 * int(pow(300 * decimals / 10000, 0.5)) + 100 * int(pow(400 * decimals / 10000, 0.5)) + 100 * int(pow(5 * decimals / 10000, 0.5)))
+    scenario.verify(dao.data.proposals[0].token_votes.positive == 100 * int(pow(300 * decimals / 10000, 0.5)) + 100 * int(pow(400 * decimals / 10000, 0.5)))
+    scenario.verify(dao.data.proposals[0].token_votes.negative == 100 * int(pow(5 * decimals / 10000, 0.5)))
     scenario.verify(dao.data.proposals[0].token_votes.abstain == 0)
     scenario.verify(dao.data.proposals[0].token_votes.participation == 3)
     scenario.verify(dao.data.representatives_votes[(0, "community1")].is_variant("abstain"))
     scenario.verify(dao.data.representatives_votes[(0, "community2")].is_variant("yes"))
     scenario.verify(dao.data.token_votes[(0, user3.address)].vote.is_variant("yes"))
-    scenario.verify(dao.data.token_votes[(0, user3.address)].weight == int(pow(300 * 100, 0.5)))
+    scenario.verify(dao.data.token_votes[(0, user3.address)].weight == 100 * int(pow(300 * decimals / 10000, 0.5)))
     scenario.verify(dao.data.token_votes[(0, user4.address)].vote.is_variant("yes"))
-    scenario.verify(dao.data.token_votes[(0, user4.address)].weight == int(pow(400 * 100, 0.5)))
+    scenario.verify(dao.data.token_votes[(0, user4.address)].weight == 100 * int(pow(400 * decimals / 10000, 0.5)))
     scenario.verify(dao.data.token_votes[(0, user5.address)].vote.is_variant("no"))
     scenario.verify(dao.data.token_votes[(0, user5.address)].weight == int(pow(5 * 100, 0.5)))
+    scenario.verify(dao.data.token_votes[(0, user5.address)].weight == 100 * int(pow(5 * decimals / 10000, 0.5)))
 
 @sp.add_test(name="Lint FAILWITH messages")
 def test_error_message_rules():
     scenario = sp.test_scenario()
     daoGovernanceModule.DAOGovernance.error_collection.scenario_linting_report(scenario)
-

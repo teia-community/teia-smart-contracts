@@ -142,13 +142,13 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
         contract_metadata = {
-            "name": "Teia Community DAO token contract",
-            "description" : "A basic DAO token contract for the Teia Community",
-            "version": "v1.0.0",
+            "name": "Teia Community DAO FA2 token contract",
+            "description" : "A basic DAO token contract for the Teia Community DAO",
+            "version": "1.0.0",
             "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
             "homepage": "https://teia.art",
             "source": {
-                "tools": ["SmartPy 0.9.1"],
+                "tools": ["SmartPy 0.10.0"],
                 "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
@@ -390,7 +390,7 @@ mint, transfer_administrator, set_metadata, add_max_share_exception""")
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            "FA_NO_NEW_ADMIN"), message="FA_NOT_PROPOSED_ADMIN")
+            "FA2_NO_NEW_ADMIN"), message="FA2_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender

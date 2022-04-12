@@ -1,0 +1,73 @@
+{
+    "name": "Teia DAO FA2 token prototype",
+    "description": "The token prototype that will be used in the Teia Community DAO",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy 0.10.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
+    },
+    "interfaces": ["TZIP-012", "TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "FA2_NOT_ADMIN"}, 
+            "expansion": { "string": "The account that executed the entry point is not the contract administrator"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_TOKEN_UNDEFINED"}, 
+            "expansion": { "string": "The provided token_id doesn't exist"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_SHARE_EXCESS"}, 
+            "expansion": { "string": "The number of total editions in the given account cannot exceed the maximum share value"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_SUPPLY_EXCEEDED"}, 
+            "expansion": { "string": "The number of token editions cannot exceed the maximum supply value"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_NOT_OPERATOR"}, 
+            "expansion": { "string": "The account that executed the entry point is not one of the token operators"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_INSUFFICIENT_BALANCE"}, 
+            "expansion": { "string": "The account doesn't have enough token editions'"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_SENDER_IS_NOT_OWNER"}, 
+            "expansion": { "string": "The account that executed the entry point is not the token owner"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_NO_NEW_ADMIN"}, 
+            "expansion": { "string": "The new administrator has not been proposed"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_NOT_PROPOSED_ADMIN"}, 
+            "expansion": { "string": "The operation can only be executed by the proposed administrator"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_WRONG_LEVEL"}, 
+            "expansion": { "string": "The provided block level is higher thant the current block level"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_WRONG_MAX_CHECKPOINTS"}, 
+            "expansion": { "string": "The value of the maximum number of checkpoints parameter should be higher than zero"},
+            "languages": ["en"] 
+        }
+    ]
+}

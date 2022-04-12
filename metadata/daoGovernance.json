@@ -1,0 +1,88 @@
+{
+    "name": "Teia DAO governance prototype",
+    "description": "The Teia DAO governance contract where proposals are submitted, voted and executed",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy 0.10.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoGovernance.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "DAO_NOT_MEMBER"}, 
+            "expansion": { "string": "The account that executed the entry point is not a DAO token holder"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_NOT_ISSUER_OR_GUARDIANS"}, 
+            "expansion": { "string": "The account that executed the entry point is not the proposal issuer or the DAO guardians"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_NOT_DAO_OR_ADMIN"}, 
+            "expansion": { "string": "The account that executed the entry point is not the DAO or the DAO administrator"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_NOT_DAO_OR_REPRESENTATIVES"}, 
+            "expansion": { "string": "The account that executed the entry point is not the DAO or the DAO representatives"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_NOT_DAO_OR_GUARDIANS"}, 
+            "expansion": { "string": "The account that executed the entry point is not the DAO or the DAO guardians"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_ALREADY_VOTED"}, 
+            "expansion": { "string": "The DAO member or representative has already voted the proposal"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_INSUFICIENT_BALANCE"}, 
+            "expansion": { "string": "The account that executed the entry point does not have enough DAO tokens to vote the proposal"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_INEXISTENT_PROPOSAL"}, 
+            "expansion": { "string": "The given proposal id doesn't exist"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_OPEN_PROPOSAL"}, 
+            "expansion": { "string": "The proposal status is still open, so it cannot be evaluated"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_CLOSED_PROPOSAL"}, 
+            "expansion": { "string": "The proposal voting period has passed and it is not possible to vote it anymore"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_WAITING_PROPOSAL"}, 
+            "expansion": { "string": "The proposal is still in the waiting period, so it cannot be executed"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_STATUS_NOT_OPEN"}, 
+            "expansion": { "string": "The proposal status is not open, so it is not possible to vote it anymore"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_STATUS_NOT_APPROVED"}, 
+            "expansion": { "string": "The proposal status is not approved, so it cannot be executed"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "DAO_STATUS_NOT_OPEN_OR_APPROVED"}, 
+            "expansion": { "string": "The proposal status is not open or approved, so it cannot be cancelled anymore"},
+            "languages": ["en"] 
+        }
+    ]
+}

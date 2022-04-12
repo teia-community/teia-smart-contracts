@@ -1,0 +1,83 @@
+{
+    "name": "Teia Community representatives multisig wallet / mini-DAO",
+    "description": "The Teia Community representatives multisig wallet used to vote in the Teia DAO.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy 0.10.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/representatives.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "REPS_NOT_REPRESENTATIVE"}, 
+            "expansion": { "string": "The operation can only be executed by one of the representatives"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_ADDRESS_EXISTS"}, 
+            "expansion": { "string": "The proposed address is already in the representatives list"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_COMMUNITY_EXISTS"}, 
+            "expansion": { "string": "The proposed community is already in the representatives list"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_WRONG_ADDRESS"}, 
+            "expansion": { "string": "The proposed address is not from a representative"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_WRONG_COMMUNITY"}, 
+            "expansion": { "string": "The proposed community is not from a representative"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_WRONG_MINIMUM_VOTES"}, 
+            "expansion": { "string": "The minimum_votes parameter cannot be smaller than 1 or higher than the number of representatives"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_WRONG_EXPIRATION_TIME"}, 
+            "expansion": { "string": "The expiration_time parameter cannot be smaller than 1 day"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_NOT_REPRESENTATIVE"}, 
+            "expansion": { "string": "The proposed address is not from a representative"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_INEXISTENT_PROPOSAL"}, 
+            "expansion": { "string": "The given proposal id doesn't exist"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_EXECUTED_PROPOSAL"}, 
+            "expansion": { "string": "The proposal has been executed and cannot be voted or executed anymore"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_EXPIRED_PROPOSAL"}, 
+            "expansion": { "string": "The proposal has expired and cannot be voted or executed anymore"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_NOT_EXECUTABLE"}, 
+            "expansion": { "string": "The proposal didn't receive enough positive votes to be executed"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "REPS_LAST_REPRESENTATIVE"}, 
+            "expansion": { "string": "The last representative cannot be removed"},
+            "languages": ["en"] 
+        }
+    ]
+}

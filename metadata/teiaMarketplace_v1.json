@@ -1,0 +1,93 @@
+{
+    "name": "Teia Community Marketplace",
+    "description": "This marketplace contract allows swapping and collecting OBJKTs and other Teia Community related FA2 tokens",
+    "version": "3.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy 0.8.10"],
+        "location": "https://github.com/teia-community/objkt-swap/blob/3.0.0/smart-py/marketplace.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "MP_NOT_MANAGER"}, 
+            "expansion": { "string": "The operation can only be executed by the contract manager"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_TEZ_TRANSFER"}, 
+            "expansion": { "string": "The operation does not accept tez transfers"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_SWAPS_PAUSED"}, 
+            "expansion": { "string": "Swaps are currently paused in the marketplace"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_COLLECTS_PAUSED"}, 
+            "expansion": { "string": "Collects are currently paused in the marketplace"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_FA2_NOT_ALLOWED"}, 
+            "expansion": { "string": "This FA2 token cannot be traded in the marketplace"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_NO_SWAPPED_EDITIONS"}, 
+            "expansion": { "string": "At least one edition needs to be swapped"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_WRONG_ROYALTIES"}, 
+            "expansion": { "string": "The royalties cannot be higher than 25%"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_WRONG_SWAP_ID"}, 
+            "expansion": { "string": "The swap_id doesn't exist"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_IS_SWAP_ISSUER"}, 
+            "expansion": { "string": "The collector cannot be the swap issuer"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_WRONG_TEZ_AMOUNT"}, 
+            "expansion": { "string": "The provided tez amount must match the edition price"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_SWAP_COLLECTED"}, 
+            "expansion": { "string": "All the swapped editions have already been collected"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_NOT_SWAP_ISSUER"}, 
+            "expansion": { "string": "Only the swap issuer can cancel the swap"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_WRONG_FEES"}, 
+            "expansion": { "string": "The marketplace fees cannot be higher than 25%"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_NO_NEW_MANAGER"}, 
+            "expansion": { "string": "The new manager has not been proposed"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "MP_NOT_PROPOSED_MANAGER"}, 
+            "expansion": { "string": "The operation can only be executed by the proposed manager"},
+            "languages": ["en"] 
+        }
+    ]
+}
