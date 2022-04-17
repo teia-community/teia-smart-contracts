@@ -21,6 +21,17 @@ ifeq ($(TARGET),)
   TARGET:=${DEFAULT_TARGET}
 endif
 
+# The environment variable TEIA_SC_PARAMS holds flags separated by ':' which
+# can be used to control metadata and test features. Leaving this blank should
+# cause contracts to run without the teia_sc package. This should not affect
+# the smart contract Michelson code output. It may however affect metadata.
+# Typical use: 
+# 'tzip16_error_inline' - turns on in-contract error script
+# 'tzip16_error_lint' - turns on additional tests and lint report for tzip16 errors
+ifeq ($(TEIA_SC_PARAMS),)
+  export TEIA_SC_PARAMS:=tzip16_error_inline:tzip16_error_lint
+endif
+
 export PYTHONPATH:=.:$(PYTHONPATH)
 
 # Contracts source

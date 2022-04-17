@@ -101,6 +101,7 @@ class ErrorCollection():
         self.contract_name = contract_name
         self.error_collection = self.contract['error_collection']
         self.flags = _TestError_default_flags.copy()
+        self.add_tzip16_error_default_kwargs = {}
 
     def inject_into_smartpy(self, sp) -> ErrorCollection:
         """Adds wrappers into SmartPy functions to gather contract failure messages.
@@ -136,7 +137,6 @@ class ErrorCollection():
         # Return self for use with instantiation
         return self
 
-
     def add_error(self, error_code, **kwargs) -> None:
         "Add error"
         errors = self.error_collection
@@ -154,20 +154,40 @@ class ErrorCollection():
         "Add or update error"
         self.error_collection[error_code].update(kwargs)
 
-    def add_tzip16_error(self, error_code, **kwargs) -> None:
-        "Add error and check input, possible kwargs in ALLOWED_ERROR_DATA_KEYS"
-        errors = self.error_collection
-        error = errors[error_code]
-        # Check for redefinitions and disallow changes in this method:
+    def tzip16_error_check_kwargs(self, **kwargs) -> None:
+        "Check if arguments are allowed."
         for key, item in kwargs.items():
-            if (key in error) and (error[key]!=item):
-                raise AttributeError(f"Redefining '{key}' with new value is not allowed, use TODO to update")
             if not key in ALLOWED_ERROR_DATA_KEYS:
                 raise AttributeError(f"'{key}' is not in the allowed error keys: {ALLOWED_ERROR_DATA_KEYS}")
             if key=='failwith_type' and item not in ALLOWED_ERROR_MESSAGE_TYPES:
                 raise AttributeError(f"'{item}' is not in the allowed error types: {ALLOWED_ERROR_MESSAGE_TYPES}")
+
+    def tzip16_error_default(self, **kwargs) -> None:
+        """Reset and set default arguments to add_tzip16_error() as given by kwargs.
+
+        This is a convenience method which gives less clutter when using add_tzip16_error to 
+        input errors in the contract script.
+        """
+        # Check kwargs are allowed
+        self.tzip16_error_check_kwargs(**kwargs)
+        # Set the new default parameters for add_tzip16_error()
+        self.add_tzip16_error_default_kwargs = dict(kwargs)
+
+    def add_tzip16_error(self, error_code, **kwargs) -> None:
+        "Add error with metadata to collection and check input. Allowed kwargs in ALLOWED_ERROR_DATA_KEYS."
+        # Check kwargs are allowed
+        self.tzip16_error_check_kwargs(**kwargs)
+        # Start with current default parameters and update them with kwargs
+        effective_kwargs = dict(self.add_tzip16_error_default_kwargs)
+        effective_kwargs.update(kwargs)
+        errors = self.error_collection
+        error = errors[error_code]
+        # Check for redefinitions and disallow changes in this method:
+        for key, item in effective_kwargs.items():
+            if (key in error) and (error[key]!=item):
+                raise AttributeError(f"Redefining '{key}' with new value is not allowed, use TODO to update")
         # Put stuff into error
-        error.update(kwargs)
+        error.update(effective_kwargs)
 
     def verify_error_collection(self, **kwargs) -> SimpleTestMessageCollector:
         "Verifies that all errors pass a set of tests."
