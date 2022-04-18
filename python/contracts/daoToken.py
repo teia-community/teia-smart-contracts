@@ -46,8 +46,58 @@ class DAOToken(sp.Contract):
         balance=sp.TNat).layout(
             ("level", "balance"))
 
-    # Handle for teia_sc tool
-    tzip16_metadata_errors = lambda : list()
+    # Basis for contract instance metadata
+    CONTRACT_METADATA_BASE = {
+        "name": "Teia Community DAO FA2 token contract",
+        "description" : "A basic DAO token contract for the Teia Community DAO",
+        "version": "1.0.0",
+        "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+        "homepage": "https://teia.art",
+        "source": {
+            "tools": ["SmartPy 0.10.0"],
+            "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
+        },
+        "interfaces": ["TZIP-012", "TZIP-016"],
+        "errors":  [{'error': {'string': 'FA2_TOKEN_UNDEFINED'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_NO_NEW_ADMIN'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_NOT_PROPOSED_ADMIN'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_NOT_ADMIN'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_SHARE_EXCESS'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_SUPPLY_EXCEEDED'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_NOT_OPERATOR'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_INSUFFICIENT_BALANCE'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_SENDER_IS_NOT_OWNER'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_WRONG_LEVEL'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_WRONG_MAX_CHECKPOINTS'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']}],
+        "views": [], # Filled in in __init__
+        "permissions": {
+            "operator": "owner-or-operator-transfer",
+            "receiver": "owner-no-hook",
+            "sender": "owner-no-hook"
+        }
+    }
 
     def __init__(self, administrator, metadata, token_metadata, max_supply, max_share):
         """Initializes the contract.
@@ -100,18 +150,8 @@ class DAOToken(sp.Contract):
 
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
-        contract_metadata = {
-            "name": "Teia Community DAO FA2 token contract",
-            "description" : "A basic DAO token contract for the Teia Community DAO",
-            "version": "1.0.0",
-            "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
-            "homepage": "https://teia.art",
-            "source": {
-                "tools": ["SmartPy 0.10.0"],
-                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
-            },
-            "interfaces": ["TZIP-012", "TZIP-016"],
-            "errors": DAOToken.tzip16_metadata_errors(),
+        self.contract_metadata = dict(DAOToken.CONTRACT_METADATA_BASE)
+        self.contract_metadata.update({
             "views": [
                 self.get_balance,
                 self.total_supply,
@@ -119,14 +159,9 @@ class DAOToken(sp.Contract):
                 self.is_operator,
                 self.token_metadata,
                 self.get_prior_balance],
-            "permissions": {
-                "operator": "owner-or-operator-transfer",
-                "receiver": "owner-no-hook",
-                "sender": "owner-no-hook"
-            }
-        }
+            })
 
-        self.init_metadata("contract_metadata", contract_metadata)
+        self.init_metadata("contract_metadata", self.contract_metadata)
 
 
     def check_is_administrator(self):
@@ -504,48 +539,12 @@ class DAOToken(sp.Contract):
         sp.result(self.data.token_metadata.get(
             token_id, message="FA2_TOKEN_UNDEFINED"))
 
-# With smartpy-cli and teia_sc we can generate contract metadata and 
-# run some extra tests: 
+# With smartpy-cli and teia_sc we can do some coverage and add further error tests:
 if 'tzip16_error_inline' in environ.get('TEIA_SC_PARAMS','').split(':'):
     from teia_sc.error_collection import ErrorCollection
-    # Start a collection for smart contract errors
-    DAOToken.error_collection = ErrorCollection(DAOToken.__name__).inject_into_smartpy(sp)
-    # Set up call back to provide the TZIP errors (used in __init__())
-    DAOToken.tzip16_metadata_errors = DAOToken.error_collection.tzip16_metadata
-    # Set a shorthand to use add_tzip16_error() 
-    tzip16_error = DAOToken.error_collection.add_tzip16_error
-    # Set default parameters add_tzip16_error()
-    DAOToken.error_collection.tzip16_error_default(failwith_type='string', expansion_type='string')
-
-    # Contract error codes, messages for wallet expansion and documentation.
-    tzip16_error("FA2_NOT_ADMIN",
-     expansion = "The caller must be the contract administrator.",
-     doc       = """Only the contract administrator can perform these operations:
-    mint, transfer_administrator, set_metadata, add_max_share_exception""")
-    tzip16_error("FA2_NOT_OPERATOR",
-      expansion="",
-      )
-    tzip16_error("FA2_SENDER_IS_NOT_OWNER",
-      expansion="",
-      )
-    tzip16_error("FA2_SHARE_EXCESS",
-      expansion="",
-      )
-    tzip16_error("FA2_SUPPLY_EXCEEDED",
-      expansion="",
-      )
-    tzip16_error("FA2_TOKEN_UNDEFINED",
-      expansion="",
-      )
-    tzip16_error("FA2_WRONG_LEVEL",
-      expansion="",
-      )
-    tzip16_error("FA2_WRONG_MAX_CHECKPOINTS",
-      expansion="",
-      )
-    tzip16_error("FA_NOT_PROPOSED_ADMIN",
-      expansion="",
-      )
+    # Start collection of smart contract errors (for runtime tests)
+    DAOToken.error_collection = ErrorCollection(DAOToken.__name__
+            ).inject_into_smartpy(sp).add_base_metadata(DAOToken)
 
 sp.add_compilation_target("daoToken", DAOToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
