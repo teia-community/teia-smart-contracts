@@ -44,11 +44,11 @@ SC_OUT_DIR:=$(realpath ./output)
 COMPILE_DIR:=$(realpath ./python)
 
 define COMPILE
-	cd ${COMPILE_DIR}; ${SMARTPY} compile ${SC_SRC_DIR}/$(strip $1).py ${SC_OUT_DIR}/contracts/${TARGET} --purge --html
+	cd ${COMPILE_DIR}; ${SMARTPY} compile ${SC_SRC_DIR}/$(strip $1).py ${SC_OUT_DIR}/contracts/$(strip $1) --purge --html
 endef
 
 define TEST
-	cd ${COMPILE_DIR}; ${SMARTPY} test ${SC_TEST_DIR}/$(strip $1)_test.py ${SC_OUT_DIR}/tests/${TARGET} --purge --html
+	cd ${COMPILE_DIR}; ${SMARTPY} test ${SC_TEST_DIR}/$(strip $1)_test.py ${SC_OUT_DIR}/tests/$(strip $1) --purge --html
 endef
 
 ## Compile the TARGET contract
