@@ -1,4 +1,5 @@
 import smartpy as sp
+from teia_sc.error_collection import ErrorCollection
 
 
 class DAOGovernance(sp.Contract):
@@ -179,6 +180,9 @@ class DAOGovernance(sp.Contract):
             amount=sp.TNat).layout(
                 ("to_", ("token_id", "amount"))))).layout(
                     ("from_", "txs")))
+
+    # Start a collection for smart contract errors
+    error_collection = ErrorCollection(__qualname__).inject_into_smartpy(sp)
 
     def __init__(self, metadata, administrator, treasury, token,
                  representatives, guardians, quorum, governance_parameters):

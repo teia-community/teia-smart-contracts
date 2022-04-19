@@ -3,7 +3,7 @@
 """
 
 import smartpy as sp
-
+from os import environ
 # Import the DAO token FA2 contract module
 daoTokenModule = sp.io.import_script_from_url("file:contracts/daoToken.py")
 
@@ -904,3 +904,11 @@ def test_add_max_share_exception():
 
     # Check that only the admin can add exceptions
     fa2.add_max_share_exception(user1.address).run(valid=False, sender=user2)
+
+
+if ('tzip16_error_lint' in environ.get('TEIA_SC_PARAMS','').split(':') and
+    type(daoTokenModule.DAOToken.error_collection).__name__ == 'ErrorCollection'):
+    @sp.add_test(name="Lint FAILWITH messages")
+    def test_error_message_rules():
+        scenario = sp.test_scenario()
+        daoTokenModule.DAOToken.error_collection.scenario_linting_report(scenario)
