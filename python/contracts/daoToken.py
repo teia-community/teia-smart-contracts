@@ -1,6 +1,7 @@
 import smartpy as sp
 from os import environ
 
+
 class DAOToken(sp.Contract):
     """This contract adapts the FA2 contract template example in smartpy.io
     v0.9.1 to be used as a DAO token.
@@ -49,7 +50,7 @@ class DAOToken(sp.Contract):
     # Basis for contract instance metadata
     CONTRACT_METADATA_BASE = {
         "name": "Teia Community DAO FA2 token contract",
-        "description" : "A basic DAO token contract for the Teia Community DAO",
+        "description": "A basic DAO token contract for the Teia Community DAO",
         "version": "1.0.0",
         "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
         "homepage": "https://teia.art",
@@ -58,7 +59,7 @@ class DAOToken(sp.Contract):
             "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
         },
         "interfaces": ["TZIP-012", "TZIP-016"],
-        "errors":  [{'error': {'string': 'FA2_TOKEN_UNDEFINED'},
+        "errors": [{'error': {'string': 'FA2_TOKEN_UNDEFINED'},
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']},
                     {'error': {'string': 'FA2_NO_NEW_ADMIN'},
@@ -91,7 +92,7 @@ class DAOToken(sp.Contract):
                     {'error': {'string': 'FA2_WRONG_MAX_CHECKPOINTS'},
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']}],
-        "views": [], # Filled in in __init__
+        "views": [],  # Filled in in __init__
         "permissions": {
             "operator": "owner-or-operator-transfer",
             "receiver": "owner-no-hook",
@@ -105,7 +106,7 @@ class DAOToken(sp.Contract):
         """
         # Define the contract storage data types for clarity
         self.init_type(sp.TRecord(
-            # The contract administrador
+            # The contract administrator
             administrator=sp.TAddress,
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
@@ -162,11 +163,10 @@ class DAOToken(sp.Contract):
                 self.all_tokens,
                 self.is_operator,
                 self.token_metadata,
-                self.get_prior_balance],
+                self.get_prior_balance]
             })
 
         self.init_metadata("contract_metadata", self.contract_metadata)
-
 
     def check_is_administrator(self):
         """Checks that the address that called the entry point is the contract
@@ -242,7 +242,7 @@ class DAOToken(sp.Contract):
             self.data.supply += mint.amount
 
             # Check that the balance is lower than the maximum share
-            sp.verify(self.data.max_share_exceptions.contains(mint.to_) |
+            sp.verify(self.data.max_share_exceptions.contains(mint.to_) | 
                       (self.data.ledger[mint.to_] < self.data.max_share),
                       message="FA2_SHARE_EXCESS")
 
@@ -277,7 +277,7 @@ class DAOToken(sp.Contract):
                 # Check that the sender is one of the token operators
                 owner = sp.compute(transfer.from_)
                 sp.verify(
-                    (sp.sender == owner) |
+                    (sp.sender == owner) | 
                     self.data.operators.contains(sp.record(
                         owner=owner,
                         operator=sp.sender,
@@ -296,7 +296,7 @@ class DAOToken(sp.Contract):
                         tx.to_, 0) + tx.amount
 
                     # Check that the balance is lower than the maximum share
-                    sp.verify(self.data.max_share_exceptions.contains(tx.to_) |
+                    sp.verify(self.data.max_share_exceptions.contains(tx.to_) | 
                               (self.data.ledger[tx.to_] < self.data.max_share),
                               message="FA2_SHARE_EXCESS")
 
@@ -442,7 +442,7 @@ class DAOToken(sp.Contract):
         sp.verify(params.level < sp.level, message="FA2_WRONG_LEVEL")
 
         # Check that, if defined, max checkpoints is larger than zero
-        sp.verify(~params.max_checkpoints.is_some() |
+        sp.verify(~params.max_checkpoints.is_some() | 
                   (params.max_checkpoints.open_some() > 0),
                   message="FA2_WRONG_MAX_CHECKPOINTS")
 
@@ -543,8 +543,9 @@ class DAOToken(sp.Contract):
         sp.result(self.data.token_metadata.get(
             token_id, message="FA2_TOKEN_UNDEFINED"))
 
+
 # With smartpy-cli and teia_sc we can do some coverage and add further error tests:
-if 'tzip16_error_inline' in environ.get('TEIA_SC_PARAMS','').split(':'):
+if 'tzip16_error_inline' in environ.get('TEIA_SC_PARAMS', '').split(':'):
     from teia_sc.error_collection import ErrorCollection
     # Start collection of smart contract errors (for runtime tests)
     DAOToken.error_collection = ErrorCollection(DAOToken.__name__

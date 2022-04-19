@@ -1270,6 +1270,7 @@ def test_quadratic_voting():
     scenario.verify(dao.data.token_votes[(0, user5.address)].vote.is_variant("no"))
     scenario.verify(dao.data.token_votes[(0, user5.address)].weight == 100 * int(pow(5 * decimals / 10000, 0.5)))
 
+
 if ('tzip16_error_lint' in environ.get('TEIA_SC_PARAMS','').split(':') and
     type(daoGovernanceModule.DAOGovernance.error_collection).__name__ == 'ErrorCollection'):
     @sp.add_test(name="Lint FAILWITH messages")
