@@ -83,14 +83,6 @@ class Representatives(sp.Contract):
         txs=sp.TList(FA2_TX_TYPE)).layout(
                 ("from_", "txs")))
 
-    VOTE_KIND_TYPE = sp.TVariant(
-        # A positive vote
-        yes=sp.TUnit,
-        # A negative vote
-        no=sp.TUnit,
-        # An abstain vote
-        abstain=sp.TUnit)
-
     def __init__(self, metadata, representatives, minimum_votes, expiration_time):
         """Initializes the contract.
 
@@ -363,7 +355,6 @@ class Representatives(sp.Contract):
         self.data.representatives[new_address] = community
         del self.data.representatives[sp.sender]
 
-
     @sp.onchain_view()
     def get_representative_community(self, address):
         """Returns the representative community
@@ -378,6 +369,7 @@ class Representatives(sp.Contract):
 
         # Return the representative community
         sp.result(community)
+
 
 sp.add_compilation_target("representatives", Representatives(
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
