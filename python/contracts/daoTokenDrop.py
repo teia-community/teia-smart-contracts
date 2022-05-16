@@ -10,6 +10,7 @@ class DAOTokenDrop(sp.Contract):
 
     The main modifications are:
         - Possibility to update the Merkle tree.
+        - Introduction of a claim period.
         - Use of batch transfers, instead of a single transfer.
         - On-chain view to get an address claimed tokens.
 
@@ -23,20 +24,22 @@ class DAOTokenDrop(sp.Contract):
         # The number of token editions
         amount=sp.TNat).layout(("to_", ("token_id", "amount"))))
 
-    def __init__(self, administrator, metadata, token, merkle_root):
+    def __init__(self, administrator, metadata, token, merkle_root, expiration_date):
         """Initializes the contract.
 
         """
         # Define the contract storage data types for clarity
         self.init_type(sp.TRecord(
-            # The contract administrador
+            # The contract administrator
             administrator=sp.TAddress,
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
             # The DAO token address
             token=sp.TAddress,
-            # The Merkle tree root associated to the DAO the distribution list
+            # The Merkle tree root associated to the DAO distribution list
             merkle_root=sp.TBytes,
+            # The claim period expiration date
+            expiration_date=sp.TTimestamp,
             # The big map with the users that already claimed their tokens
             claimed=sp.TBigMap(sp.TAddress, sp.TNat),
             # The proposed new administrator address
@@ -48,6 +51,7 @@ class DAOTokenDrop(sp.Contract):
             metadata=metadata,
             token=token,
             merkle_root=merkle_root,
+            expiration_date=expiration_date,
             claimed=sp.big_map(),
             proposed_administrator=sp.none)
 
@@ -91,7 +95,7 @@ class DAOTokenDrop(sp.Contract):
             address=self.data.token,
             entry_point="transfer").open_some()
 
-        # Execute the tranfer
+        # Execute the transfer
         sp.transfer(
             arg=sp.list([sp.record(
                 from_=sp.self_address,
@@ -111,6 +115,10 @@ class DAOTokenDrop(sp.Contract):
 
         # Check that the sender didn't transfer any tez
         sp.verify(sp.amount == sp.tez(0), message="DROP_TEZ_TRANSFER")
+
+        # Check that the claim period didn't expire
+        sp.verify(sp.now < self.data.expiration_date,
+                  message="DROP_CLAIM_EXPIRED")
 
         # Unpack the leaf data
         leaf_data_type = sp.TRecord(
@@ -170,6 +178,20 @@ class DAOTokenDrop(sp.Contract):
         self.data.merkle_root = new_merkle_root
 
     @sp.entry_point
+    def update_expiration_date(self, new_expiration_date):
+        """Updates the claim expiration date.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_expiration_date, sp.TTimestamp)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Update the claim expiration date
+        self.data.expiration_date = new_expiration_date
+
+    @sp.entry_point
     def transfer_administrator(self, proposed_administrator):
         """Proposes to transfer the contract administrator to another address.
 
@@ -186,7 +208,7 @@ class DAOTokenDrop(sp.Contract):
     @sp.entry_point
     def accept_administrator(self):
         """The proposed administrator accepts the contract administrator
-        responsabilities.
+        responsibilities.
 
         """
         # Check that the proposed administrator executed the entry point
@@ -215,4 +237,5 @@ sp.add_compilation_target("daoTokenDrop", DAOTokenDrop(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
     token=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa"),
-    merkle_root=sp.bytes("0x00")))
+    merkle_root=sp.bytes("0x00"),
+    expiration_date=sp.timestamp_from_utc(2022, 10, 30, 23, 59, 59)))

@@ -82,7 +82,8 @@ def get_test_environment():
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://ccc"),
         token=daoToken.address,
-        merkle_root=merkle_root_1)
+        merkle_root=merkle_root_1,
+        expiration_date=sp.timestamp_from_utc(2022, 12, 31, 23, 59, 59))
     scenario += daoTokenDrop
 
     # Add the DAO token drop contract as a maximum share exception
@@ -123,6 +124,12 @@ def test_claim():
         proof=proof_user1_1,
         leaf=sp.pack(sp.record(address=user1, value=tokens_user1_1)))).run(
             valid=False, sender=user1, amount=sp.tez(2), exception="DROP_TEZ_TRANSFER")
+
+    # Check that claiming the tokens after the expiration date fails
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user1_1,
+        leaf=sp.pack(sp.record(address=user1, value=tokens_user1_1)))).run(
+            valid=False, sender=user1, now=sp.timestamp_from_utc(2023, 1, 1, 0, 0, 0), exception="DROP_CLAIM_EXPIRED")
 
     # Check that the packing needs to be correct
     daoTokenDrop.claim(sp.record(
@@ -313,6 +320,61 @@ def test_update_merkle_root():
     scenario.verify(daoTokenDrop.claimed_tokens(user3) == tokens_user3_2)
     scenario.verify(daoTokenDrop.claimed_tokens(user4) == tokens_user4_2)
     scenario.verify(daoTokenDrop.claimed_tokens(user5) == tokens_user5_2)
+
+
+@sp.add_test(name="Test update expiration date")
+def test_update_expiration_date():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    daoToken = testEnvironment["daoToken"]
+    daoTokenDrop = testEnvironment["daoTokenDrop"]
+
+    # User 1 claim their tokens
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user1_1,
+        leaf=sp.pack(sp.record(address=user1, value=tokens_user1_1)))).run(
+            sender=user1, now=sp.timestamp_from_utc(2022, 12, 31, 23, 59, 50))
+
+    # Check that user 2 claimed their tokens too late
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user2_1,
+        leaf=sp.pack(sp.record(address=user2, value=tokens_user2_1)))).run(
+            valid=False, sender=user2, now=sp.timestamp_from_utc(2023, 1, 1, 0, 0, 0), exception="DROP_CLAIM_EXPIRED")
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == tokens_user1_1)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == 0)
+    scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == sp.as_nat(
+        1500 - tokens_user1_1))
+    scenario.verify(daoTokenDrop.claimed_tokens(user1) == tokens_user1_1)
+    scenario.verify(daoTokenDrop.claimed_tokens(user2) == 0)
+
+    # Check that only the admin can update the expiration date
+    daoTokenDrop.update_expiration_date(
+        sp.timestamp_from_utc(2023, 5, 1, 0, 0, 0)).run(valid=False, sender=user1, exception="DROP_NOT_ADMIN")
+
+    # Change the expiration date
+    daoTokenDrop.update_expiration_date(
+        sp.timestamp_from_utc(2023, 5, 1, 0, 0, 0)).run(sender=admin)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoTokenDrop.data.expiration_date == sp.timestamp_from_utc(2023, 5, 1, 0, 0, 0))
+
+    # Check that user 2 can now claim their tokens
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user2_1,
+        leaf=sp.pack(sp.record(address=user2, value=tokens_user2_1)))).run(
+            sender=user2, now=sp.timestamp_from_utc(2023, 3, 1, 0, 0, 0))
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == tokens_user1_1)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == tokens_user2_1)
+    scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == sp.as_nat(
+        1500 - (tokens_user1_1 + tokens_user2_1)))
+    scenario.verify(daoTokenDrop.claimed_tokens(user1) == tokens_user1_1)
+    scenario.verify(daoTokenDrop.claimed_tokens(user2) == tokens_user2_1)
 
 
 @sp.add_test(name="Test transfer and accept administrator")

@@ -12,7 +12,7 @@ class DAOToken(sp.Contract):
     The contract follows the FA2 standard specification:
     https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md
 
-    The contract makes used of the kolibi DAO implementation of token balance
+    The contract makes used of the Kolibri DAO implementation of token balance
     checkpoints:
     https://github.com/Hover-Labs/murmuration/blob/main/docs/token.md
 
@@ -383,7 +383,7 @@ class DAOToken(sp.Contract):
     @sp.entry_point
     def accept_administrator(self):
         """The proposed administrator accepts the contract administrator
-        responsabilities.
+        responsibilities.
 
         """
         # Check that the proposed administrator executed the entry point
