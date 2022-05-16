@@ -150,10 +150,14 @@ class DAOToken(sp.Contract):
             proposed_administrator=sp.none)
 
         # Build the TZIP-016 contract metadata
-        # This is helpful to get the off-chain views code in json format
+        # (For producing metadata JSON and TZIP-16 linting)
         self.contract_metadata = dict(DAOToken.CONTRACT_METADATA_BASE)
         self.contract_metadata.update({
-            "views": [
+            "views": [ 
+                # NOTE: TZIP-16 specifies views as a list of offchain views, so perhaps 
+                # adding "onchain" : "true" seems reasonable. The structure is however
+                # not built until the init_metadata call. So it would perhaps be better 
+                # to ask smartpy if they can add it. 
                 self.get_balance,
                 self.total_supply,
                 self.all_tokens,

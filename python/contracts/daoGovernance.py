@@ -1,5 +1,5 @@
 import smartpy as sp
-from teia_sc.error_collection import ErrorCollection
+from os import environ
 
 
 class DAOGovernance(sp.Contract):
@@ -181,8 +181,50 @@ class DAOGovernance(sp.Contract):
                 ("to_", ("token_id", "amount"))))).layout(
                     ("from_", "txs")))
 
-    # Start a collection for smart contract errors
-    error_collection = ErrorCollection(__qualname__).inject_into_smartpy(sp)
+    # Basis for contract instance metadata
+    CONTRACT_METADATA_BASE = {
+        # TODO: Add other fields, perhaps use a common header?
+        'errors': [{'error': {'string': 'DAO_NOT_MEMBER'},
+             'expansion': {'string': 'The caller is not considered a DAO member. Typically due to a 0 token balance.'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_NOT_ISSUER_NOR_GUARDIAN'},
+             'expansion': {'string': 'The caller is neither a guardian, nor a proposal issuer, one of which is required for this entry-point.'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_STATUS_NOT_OPEN_OR_APPROVED'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_STATUS_NOT_OPEN'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_OPEN_PROPOSAL'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_STATUS_NOT_APPROVED'},
+             'expansion': {'string': 'The operation can not be performed because the proposal has not been approved (yet).'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_WAITING_PROPOSAL'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_CLOSED_PROPOSAL'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_ALREADY_VOTED'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_NOT_DAO_OR_ADMIN'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_NOT_DAO_OR_GUARDIANS'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_NOT_DAO_OR_REPRESENTATIVES'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']},
+            {'error': {'string': 'DAO_INSUFICIENT_BALANCE'},
+             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
+             'languages': ['en']}]
+        }
+            
 
     def __init__(self, metadata, administrator, treasury, token,
                  representatives, guardians, quorum, governance_parameters):
@@ -223,6 +265,7 @@ class DAOGovernance(sp.Contract):
             # The proposals counter
             counter=sp.TNat))
 
+
         # Initialize the contract storage
         self.init(
             metadata=metadata,
@@ -239,6 +282,13 @@ class DAOGovernance(sp.Contract):
             representatives_votes=sp.big_map(),
             gp_counter=1,
             counter=0)
+
+        # Build the TZIP-016 contract metadata
+        # (For producing metadata JSON and TZIP-16 linting)
+        self.contract_metadata = dict(DAOGovernance.CONTRACT_METADATA_BASE)
+        self.contract_metadata.update({}) 
+
+        self.init_metadata("contract_metadata", self.contract_metadata)
 
     @sp.private_lambda(with_storage=None, with_operations=False, wrap_call=True)
     def check_is_dao_member(self, token):
@@ -568,7 +618,7 @@ class DAOGovernance(sp.Contract):
         # issuer or the DAO guardians
         sp.verify((sp.sender == proposal.issuer) | 
                   (sp.sender == self.data.guardians),
-                  message="DAO_NOT_ISSUER_OR_GUARDIANS")
+                  message="DAO_NOT_ISSUER_NOR_GUARDIAN")
 
         # Check that the proposal status is set as open or approved
         sp.verify(proposal.status.is_variant("open") | 
@@ -867,6 +917,12 @@ class DAOGovernance(sp.Contract):
         # Store the result in the counter just for test purposes
         self.data.counter = self.integer_square_root(number)
 
+# With smartpy-cli and teia_sc we can do some coverage and lint towards TZIP-16 compliance:
+if 'tzip16_error_inline' in environ.get('TEIA_SC_PARAMS','').split(':'):
+    from teia_sc.error_collection import ErrorCollection
+    # Start collection of smart contract errors (for runtime tests)
+    DAOGovernance.error_collection = ErrorCollection(DAOGovernance.__name__
+            ).inject_into_smartpy(sp).add_base_metadata(DAOGovernance)
 
 sp.add_compilation_target("dao", DAOGovernance(
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),

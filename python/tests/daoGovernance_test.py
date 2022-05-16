@@ -1,7 +1,7 @@
 """Unit tests for the DAO governance class.
 
 """
-
+from os import environ
 import smartpy as sp
 
 # Import the DAO modules
@@ -1271,7 +1271,9 @@ def test_quadratic_voting():
     scenario.verify(dao.data.token_votes[(0, user5.address)].weight == 100 * int(pow(5 * decimals / 10000, 0.5)))
 
 
-@sp.add_test(name="Lint FAILWITH messages")
-def test_error_message_rules():
-    scenario = sp.test_scenario()
-    daoGovernanceModule.DAOGovernance.error_collection.scenario_linting_report(scenario)
+if ('tzip16_error_lint' in environ.get('TEIA_SC_PARAMS','').split(':') and
+    type(daoGovernanceModule.DAOGovernance.error_collection).__name__ == 'ErrorCollection'):
+    @sp.add_test(name="Lint FAILWITH messages")
+    def test_error_message_rules():
+        scenario = sp.test_scenario()
+        daoGovernanceModule.DAOGovernance.error_collection.scenario_linting_report(scenario)
