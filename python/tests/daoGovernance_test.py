@@ -57,7 +57,7 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"),
         token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
-        max_supply=2000 * decimals,
+        supply=2000 * decimals,
         max_share=500 * decimals)
     scenario += token
 
@@ -120,15 +120,19 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
     token.add_max_share_exception(treasury.address).run(sender=admin)
     token.add_max_share_exception(dao.address).run(sender=admin)
 
-    # Mint all the DAO tokens and assign them to the users and the treasury
-    token.mint([
-        sp.record(to_=user1.address, token_id=0, amount=100 * decimals),
-        sp.record(to_=user2.address, token_id=0, amount=200 * decimals),
-        sp.record(to_=user3.address, token_id=0, amount=300 * decimals),
-        sp.record(to_=user4.address, token_id=0, amount=400 * decimals),
-        sp.record(to_=user5.address, token_id=0, amount=5 * decimals),
-        sp.record(to_=user6.address, token_id=0, amount=5 * decimals),
-        sp.record(to_=treasury.address, token_id=0, amount=990 * decimals)]).run(sender=admin)
+    # Transfer some the editions from the admin to the users and the treasury
+    token.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[
+                sp.record(to_=user1.address, token_id=0, amount=100 * decimals),
+                sp.record(to_=user2.address, token_id=0, amount=200 * decimals),
+                sp.record(to_=user3.address, token_id=0, amount=300 * decimals),
+                sp.record(to_=user4.address, token_id=0, amount=400 * decimals),
+                sp.record(to_=user5.address, token_id=0, amount=5 * decimals),
+                sp.record(to_=user6.address, token_id=0, amount=5 * decimals),
+                sp.record(to_=treasury.address, token_id=0, amount=990 * decimals)])
+        ]).run(sender=admin)
 
     # Add the DAO as operator to the users tokens
     token.update_operators([sp.variant("add_operator", sp.record(
@@ -832,7 +836,7 @@ def test_cancel_proposal():
 
     # Check that only the proposal issuer can cancel the proposal
     dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
-        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER_OR_GUARDIANS")
+        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER_NOR_GUARDIAN")
 
     # Cancel the proposal
     dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
