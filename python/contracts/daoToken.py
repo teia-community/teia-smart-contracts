@@ -100,7 +100,7 @@ class DAOToken(sp.Contract):
         }
     }
 
-    def __init__(self, administrator, metadata, token_metadata, max_supply, max_share):
+    def __init__(self, administrator, metadata, token_metadata, supply, max_share):
         """Initializes the contract.
 
         """
@@ -114,9 +114,7 @@ class DAOToken(sp.Contract):
             ledger=sp.TBigMap(sp.TAddress, sp.TNat),
             # The token total supply
             supply=sp.TNat,
-            # The token maximum supply
-            max_supply=sp.TNat,
-            # The maximum number of tokens that a owner can have
+            # The maximum number of tokens that a DAO member can have
             max_share=sp.TNat,
             # The big map with the token metadata
             token_metadata=sp.TBigMap(
@@ -137,9 +135,8 @@ class DAOToken(sp.Contract):
         self.init(
             administrator=administrator,
             metadata=metadata,
-            ledger=sp.big_map(),
-            supply=0,
-            max_supply=max_supply,
+            ledger=sp.big_map({administrator: supply}),
+            supply=supply,
             max_share=max_share,
             token_metadata=sp.big_map({
                 0: sp.record(token_id=0, token_info={"": token_metadata})}),
@@ -215,43 +212,6 @@ class DAOToken(sp.Contract):
 
             # Increase the owner checkpoints counter
             self.data.n_checkpoints[owner] = 1
-
-    @sp.entry_point
-    def mint(self, params):
-        """Mints new token editions.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TList(sp.TRecord(
-            to_=sp.TAddress,
-            token_id=sp.TNat,
-            amount=sp.TNat).layout(
-                ("to_", ("token_id", "amount")))))
-
-        # Check that the administrator executed the entry point
-        self.check_is_administrator()
-
-        # Loop over the list of mints
-        with sp.for_("mint", params) as mint:
-            # Check that the token exists
-            self.check_token_exists(mint.token_id)
-
-            # Update the ledger big map and the total supply
-            self.data.ledger[mint.to_] = self.data.ledger.get(
-                mint.to_, 0) + mint.amount
-            self.data.supply += mint.amount
-
-            # Check that the balance is lower than the maximum share
-            sp.verify(self.data.max_share_exceptions.contains(mint.to_) | 
-                      (self.data.ledger[mint.to_] < self.data.max_share),
-                      message="FA2_SHARE_EXCESS")
-
-            # Check that the total supply is not larger than the maximum supply
-            sp.verify(self.data.supply <= self.data.max_supply,
-                      message="FA2_SUPPLY_EXCEEDED")
-
-            # Add a balance checkpoint
-            self.add_checkpoint(mint.to_)
 
     @sp.entry_point
     def transfer(self, params):
@@ -555,5 +515,5 @@ sp.add_compilation_target("daoToken", DAOToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
     metadata=sp.utils.metadata_of_url("ipfs://aaa"),
     token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
-    max_supply=1000000000000,
+    supply=1000000000000,
     max_share=50000000000))

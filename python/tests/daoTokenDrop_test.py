@@ -73,7 +73,7 @@ def get_test_environment():
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"),
         token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
-        max_supply=1500,
+        supply=1500,
         max_share=350)
     scenario += daoToken
 
@@ -89,11 +89,12 @@ def get_test_environment():
     # Add the DAO token drop contract as a maximum share exception
     daoToken.add_max_share_exception(daoTokenDrop.address).run(sender=admin)
 
-    # Mint all the DAO tokens and assign them to the DAO token drop contract
-    daoToken.mint([sp.record(
-        to_=daoTokenDrop.address,
-        token_id=0,
-        amount=1500)]).run(sender=admin)
+    # Transfer all the editions from the admin to the DAO token drop contract
+    daoToken.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=daoTokenDrop.address, token_id=0, amount=1500)])
+        ]).run(sender=admin)
 
     # Save all the variables in a test environment dictionary
     testEnvironment = {
