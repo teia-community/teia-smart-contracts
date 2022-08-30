@@ -651,4 +651,4 @@ class HarbergerTaxToken(sp.Contract):
 
 sp.add_compilation_target("harbergerTaxToken", HarbergerTaxToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
-    metadata=sp.utils.metadata_of_url("ipfs://aaa")))
+    metadata=sp.utils.metadata_of_url("ipfs://bbb")))
