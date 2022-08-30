@@ -13,6 +13,7 @@
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
+| [Harberger tax FA2 token](python/contracts/harbergerTaxToken.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -38,6 +39,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py ../output/contracts/daoGovernance --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py ../output/contracts/daoTreasury --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/harbergerTaxToken.py ../output/contracts/harbergerTaxToken --html --purge
 ```
 
 ## Execute the tests
