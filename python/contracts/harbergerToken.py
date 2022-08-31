@@ -1,9 +1,9 @@
 import smartpy as sp
 
 
-class HarbergerTaxToken(sp.Contract):
+class HarbergerToken(sp.Contract):
     """This contract extends the FA2 contract template example in smartpy.io
-    v0.9.1 to apply a Harberger tax to the token owners.
+    v0.9.1 to apply a Harberger fee to the token owners.
 
     The FA2 template was originally developed by Seb Mondet:
     https://gitlab.com/smondet/fa2-smartpy
@@ -20,16 +20,16 @@ class HarbergerTaxToken(sp.Contract):
         token_info=sp.TMap(sp.TString, sp.TBytes)).layout(
             ("token_id", "token_info"))
 
-    TOKEN_TAX_VALUE_TYPE = sp.TRecord(
+    TOKEN_FEE_VALUE_TYPE = sp.TRecord(
         # The current price set by the token owner
         price=sp.TMutez,
-        # The Harberger tax in per mile
-        tax=sp.TNat,
-        # The Harberger tax recipient
-        tax_recipient=sp.TAddress,
-        # The deadline for the next tax payment
+        # The Harberger fee in per mile
+        fee=sp.TNat,
+        # The Harberger fee recipient
+        fee_recipient=sp.TAddress,
+        # The deadline for the next fee payment
         next_payment=sp.TTimestamp).layout(
-            ("price", ("tax", ("tax_recipient", "next_payment"))))
+            ("price", ("fee", ("fee_recipient", "next_payment"))))
 
     OPERATOR_KEY_TYPE = sp.TRecord(
         # The token owner
@@ -54,13 +54,13 @@ class HarbergerTaxToken(sp.Contract):
             ledger=sp.TBigMap(sp.TNat, sp.TAddress),
             # The big map with the tokens metadata
             token_metadata=sp.TBigMap(
-                sp.TNat, HarbergerTaxToken.TOKEN_METADATA_VALUE_TYPE),
-            # The big map with the tokens tax information
-            token_tax=sp.TBigMap(
-                sp.TNat, HarbergerTaxToken.TOKEN_TAX_VALUE_TYPE),
+                sp.TNat, HarbergerToken.TOKEN_METADATA_VALUE_TYPE),
+            # The big map with the tokens fee information
+            token_fee=sp.TBigMap(
+                sp.TNat, HarbergerToken.TOKEN_FEE_VALUE_TYPE),
             # The big map with the tokens operators
-            operators=sp.TBigMap(HarbergerTaxToken.OPERATOR_KEY_TYPE, sp.TUnit),
-            # The big map with the token owners deposits to pay the taxes
+            operators=sp.TBigMap(HarbergerToken.OPERATOR_KEY_TYPE, sp.TUnit),
+            # The big map with the token owners deposits to pay the fees
             deposits=sp.TBigMap(sp.TAddress, sp.TMutez),
             # The proposed new administrator address
             proposed_administrator=sp.TOption(sp.TAddress),
@@ -73,7 +73,7 @@ class HarbergerTaxToken(sp.Contract):
             metadata=metadata,
             ledger=sp.big_map(),
             token_metadata=sp.big_map(),
-            token_tax=sp.big_map(),
+            token_fee=sp.big_map(),
             operators=sp.big_map(),
             deposits=sp.big_map(),
             proposed_administrator=sp.none,
@@ -82,16 +82,16 @@ class HarbergerTaxToken(sp.Contract):
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
         contract_metadata = {
-            "name": "Extended FA2 template contract with a Harberger tax",
+            "name": "Extended FA2 template contract with a Harberger fee",
             "description": "This contract extends the FA2 contract template "
-            "example in smartpy.io v0.9.1 to apply a Harberger tax to the "
+            "example in smartpy.io v0.9.1 to apply a Harberger fee to the "
             "token owners",
             "version": "v1.0.0",
             "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
             "homepage": "https://teia.art",
             "source": {
                 "tools": ["SmartPy 0.9.1"],
-                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/harbergerTaxToken.py"
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/harbergerToken.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
             "views": [
@@ -123,7 +123,7 @@ class HarbergerTaxToken(sp.Contract):
         sp.verify(token_id < self.data.counter, message="FA2_TOKEN_UNDEFINED")
 
     def check_has_deposit(self, user):
-        """Checks that the given user has a deposit to pay the taxes.
+        """Checks that the given user has a deposit to pay the fees.
 
         """
         sp.verify(self.data.deposits.contains(user),
@@ -170,14 +170,14 @@ class HarbergerTaxToken(sp.Contract):
             creator=sp.TAddress,
             metadata=sp.TMap(sp.TString, sp.TBytes),
             price=sp.TMutez,
-            tax=sp.TNat).layout(
-                ("creator", ("metadata", ("price", "tax")))))
+            fee=sp.TNat).layout(
+                ("creator", ("metadata", ("price", "fee")))))
 
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Check that the tax does not exceed 100%
-        sp.verify(params.tax <= 1000, message="FA2_INVALID_TAX")
+        # Check that the fee does not exceed 100%
+        sp.verify(params.fee <= 1000, message="FA2_INVALID_FEE")
 
         # Update the big maps
         token_id = sp.compute(self.data.counter)
@@ -185,10 +185,10 @@ class HarbergerTaxToken(sp.Contract):
         self.data.token_metadata[token_id] = sp.record(
             token_id=token_id,
             token_info=params.metadata)
-        self.data.token_tax[token_id] = sp.record(
+        self.data.token_fee[token_id] = sp.record(
             price=params.price,
-            tax=params.tax,
-            tax_recipient=params.creator,
+            fee=params.fee,
+            fee_recipient=params.creator,
             next_payment=sp.now)
 
         # Increase the tokens counter
@@ -198,7 +198,7 @@ class HarbergerTaxToken(sp.Contract):
     def set_price(self, params):
         """Sets a new price for the token.
 
-        Before updating the price all remaining taxes need to be paid.
+        Before updating the price all remaining fees need to be paid.
 
         """
         # Define the input parameter data type
@@ -214,59 +214,59 @@ class HarbergerTaxToken(sp.Contract):
         sp.verify(sp.sender == self.data.ledger[params.token_id],
                   message="FA2_SENDER_IS_NOT_OWNER")
 
-        # Get the tax information
-        tax_information = sp.compute(self.data.token_tax[params.token_id])
+        # Get the fee information
+        fee_information = sp.compute(self.data.token_fee[params.token_id])
 
-        # Charge the tax if the sender is not the tax recipient
-        with sp.if_(sp.sender != tax_information.tax_recipient):
-            # Check that the owner has a deposit for the taxes
+        # Charge the fee if the sender is not the fee recipient
+        with sp.if_(sp.sender != fee_information.fee_recipient):
+            # Check that the owner has a deposit for the fees
             self.check_has_deposit(sp.sender)
 
-            # Calculate the tax amount to pay for the new price
-            tax = sp.local("tax",
-                sp.split_tokens(params.price, tax_information.tax, 1000))
+            # Calculate the fee amount to pay for the new price
+            fee = sp.local("fee",
+                sp.split_tokens(params.price, fee_information.fee, 1000))
 
-            # Calculate the remaining tax amount from the old price
+            # Calculate the remaining fee amount from the old price
             montly_payment = sp.split_tokens(
-                tax_information.price, tax_information.tax, 1000)
-            remaining_tax = sp.compute(sp.split_tokens(
-                montly_payment, abs(sp.now - tax_information.next_payment),
+                fee_information.price, fee_information.fee, 1000)
+            remaining_fee = sp.compute(sp.split_tokens(
+                montly_payment, abs(sp.now - fee_information.next_payment),
                 3600 * 24 * 30))
 
-            # Combine the two taxes
-            with sp.if_(sp.now < tax_information.next_payment):
-                with sp.if_(tax.value > remaining_tax):
-                    tax.value -= remaining_tax
+            # Combine the two fees
+            with sp.if_(sp.now < fee_information.next_payment):
+                with sp.if_(fee.value > remaining_fee):
+                    fee.value -= remaining_fee
                 with sp.else_():
-                    tax.value = sp.mutez(0)
+                    fee.value = sp.mutez(0)
             with sp.else_():
-                tax.value += remaining_tax
+                fee.value += remaining_fee
 
-            # Check if there is some tax to pay
-            with sp.if_(tax.value > sp.mutez(0)):
+            # Check if there is some fee to pay
+            with sp.if_(fee.value > sp.mutez(0)):
                 # Check that the owner has enough tez in their deposit to pay
-                # the tax
-                sp.verify(self.data.deposits[sp.sender] >= tax.value,
+                # the fee
+                sp.verify(self.data.deposits[sp.sender] >= fee.value,
                     message="FA2_INSUFFICIENT_TEZ_BALANCE")
 
-                # Subtract the tax to the owner deposit
-                self.data.deposits[sp.sender] -= tax.value
+                # Subtract the fee to the owner deposit
+                self.data.deposits[sp.sender] -= fee.value
 
-                # Send the tax to the tax recipient
-                sp.send(tax_information.tax_recipient, tax.value)
+                # Send the fee to the fee recipient
+                sp.send(fee_information.fee_recipient, fee.value)
 
-        # Update the tax information
-        self.data.token_tax[params.token_id] = sp.record(
+        # Update the fee information
+        self.data.token_fee[params.token_id] = sp.record(
             price=params.price,
-            tax=tax_information.tax,
-            tax_recipient=tax_information.tax_recipient,
+            fee=fee_information.fee,
+            fee_recipient=fee_information.fee_recipient,
             next_payment=sp.now.add_days(30))
 
     @sp.entry_point
-    def pay_taxes(self, params):
-        """Pays the taxes associated to a given token.
+    def pay_fees(self, params):
+        """Pays the fees associated to a given token.
 
-        Any user can pay the taxes of a given token. They don't need to own the
+        Any user can pay the fees of a given token. They don't need to own the
         token.
 
         """
@@ -279,44 +279,44 @@ class HarbergerTaxToken(sp.Contract):
         # Check that the token exists
         self.check_token_exists(params.token_id)
 
-        # Check that the sender has a deposit for the taxes
+        # Check that the sender has a deposit for the fees
         self.check_has_deposit(sp.sender)
 
-        # Get the tax information
-        tax_information = sp.compute(self.data.token_tax[params.token_id])
+        # Get the fee information
+        fee_information = sp.compute(self.data.token_fee[params.token_id])
 
-        # Check that the tax recipient is not the current token owner. The tax
-        # recipient never pays taxes
-        sp.verify(tax_information.tax_recipient != self.data.ledger[params.token_id],
-                  message="FA2_OWNER_IS_TAX_RECIPIENT")
+        # Check that the fee recipient is not the current token owner. The fee
+        # recipient never pays fees
+        sp.verify(fee_information.fee_recipient != self.data.ledger[params.token_id],
+                  message="FA2_OWNER_IS_FEE_RECIPIENT")
 
-        # Calculate the amount of taxes to pay
-        tax = sp.compute(sp.mul(params.months, sp.split_tokens(
-            tax_information.price, tax_information.tax, 1000)))
+        # Calculate the amount of fees to pay
+        fee = sp.compute(sp.mul(params.months, sp.split_tokens(
+            fee_information.price, fee_information.fee, 1000)))
 
-        # Check if there is some tax to pay
-        with sp.if_(tax > sp.mutez(0)):
+        # Check if there is some fee to pay
+        with sp.if_(fee > sp.mutez(0)):
             # Check that the sender has enough tez in their deposit to pay
-            sp.verify(self.data.deposits[sp.sender] >= tax,
+            sp.verify(self.data.deposits[sp.sender] >= fee,
                 message="FA2_INSUFFICIENT_TEZ_BALANCE")
 
-            # Subtract the tax from the sender deposit
-            self.data.deposits[sp.sender] -= tax
+            # Subtract the fee from the sender deposit
+            self.data.deposits[sp.sender] -= fee
 
-            # Send the tax to the tax recipient
-            sp.send(tax_information.tax_recipient, tax)
+            # Send the fee to the fee recipient
+            sp.send(fee_information.fee_recipient, fee)
 
         # Update the deadline for the next payment
-        self.data.token_tax[params.token_id].next_payment = tax_information.next_payment.add_days(
+        self.data.token_fee[params.token_id].next_payment = fee_information.next_payment.add_days(
             sp.mul(params.months, 30))
 
     @sp.entry_point
-    def apply_taxes(self, token_id):
-        """Applies the taxes associated to a given token.
+    def apply_fees(self, token_id):
+        """Applies the fees associated to a given token.
 
         Anyone can call this entrypoint.
 
-        If the owner does not have enough tez in their deposit to pay the taxes,
+        If the owner does not have enough tez in their deposit to pay the fees,
         the token price is set to zero, and could be collected by anyone.
 
         """
@@ -326,50 +326,50 @@ class HarbergerTaxToken(sp.Contract):
         # Check that the token exists
         self.check_token_exists(token_id)
 
-        # Get the tax information
-        tax_information = sp.compute(self.data.token_tax[token_id])
+        # Get the fee information
+        fee_information = sp.compute(self.data.token_fee[token_id])
 
-        # Check that the tax recipient is not the current token owner. The tax
-        # recipient never pays taxes
-        sp.verify(tax_information.tax_recipient != self.data.ledger[token_id],
-                  message="FA2_OWNER_IS_TAX_RECIPIENT")
+        # Check that the fee recipient is not the current token owner. The fee
+        # recipient never pays fees
+        sp.verify(fee_information.fee_recipient != self.data.ledger[token_id],
+                  message="FA2_OWNER_IS_FEE_RECIPIENT")
 
-        # Check if the tax deadline has expired
-        with sp.if_(sp.now > tax_information.next_payment):
-            # Calculate the amount of taxes to pay
+        # Check if the fee deadline has expired
+        with sp.if_(sp.now > fee_information.next_payment):
+            # Calculate the amount of fees to pay
             montly_payment = sp.split_tokens(
-                tax_information.price, tax_information.tax, 1000)
+                fee_information.price, fee_information.fee, 1000)
             months_to_pay = sp.compute(1 + (
-                sp.as_nat(sp.now - tax_information.next_payment) // sp.nat(3600 * 24 * 30)))
-            tax = sp.compute(sp.mul(months_to_pay, montly_payment))
+                sp.as_nat(sp.now - fee_information.next_payment) // sp.nat(3600 * 24 * 30)))
+            fee = sp.compute(sp.mul(months_to_pay, montly_payment))
 
-            # Check if there is some tax to pay
-            with sp.if_(tax > sp.mutez(0)):
+            # Check if there is some fee to pay
+            with sp.if_(fee > sp.mutez(0)):
                 # Check if owner has enough tez in their deposit to pay
                 owner = sp.compute(self.data.ledger[token_id])
                 deposit = sp.compute(self.data.deposits.get(owner, sp.mutez(0)))
 
-                with sp.if_(deposit >= tax):
-                    # Subtract the tax from the owners deposit
-                    self.data.deposits[owner] = deposit - tax
+                with sp.if_(deposit >= fee):
+                    # Subtract the fee from the owners deposit
+                    self.data.deposits[owner] = deposit - fee
 
-                    # Send the tax to the tax recipient
-                    sp.send(tax_information.tax_recipient, tax)
+                    # Send the fee to the fee recipient
+                    sp.send(fee_information.fee_recipient, fee)
 
                     # Update the deadline for the next payment
-                    self.data.token_tax[token_id].next_payment = tax_information.next_payment.add_days(
+                    self.data.token_fee[token_id].next_payment = fee_information.next_payment.add_days(
                         sp.mul(months_to_pay, 30))
                 with sp.else_():
                     with sp.if_(deposit > sp.mutez(0)):
                         # Send whatever is available in the owner deposit to the
-                        # tax recipient
-                        sp.send(tax_information.tax_recipient, deposit)
+                        # fee recipient
+                        sp.send(fee_information.fee_recipient, deposit)
 
                         # Set the owner deposit to zero
                         self.data.deposits[owner] = sp.mutez(0)
 
                     # Set the token price to zero, so anyone could collect it
-                    self.data.token_tax[token_id].price = sp.mutez(0)
+                    self.data.token_fee[token_id].price = sp.mutez(0)
 
     @sp.entry_point
     def collect(self, params):
@@ -385,38 +385,38 @@ class HarbergerTaxToken(sp.Contract):
         # Check that the token exists
         self.check_token_exists(params.token_id)
 
-        # Get the tax information
-        tax_information = sp.compute(self.data.token_tax[params.token_id])
+        # Get the fee information
+        fee_information = sp.compute(self.data.token_fee[params.token_id])
 
         # Check that the provided tez amount is exactly the token price
-        sp.verify(sp.amount == tax_information.price,
+        sp.verify(sp.amount == fee_information.price,
                   message="FA2_WRONG_TEZ_AMOUNT")
 
         # Send the tez to the previous owner
         with sp.if_(sp.amount > sp.mutez(0)):
             sp.send(self.data.ledger[params.token_id], sp.amount)
 
-        # Calculate the tax amount to pay for the new price
-        tax = sp.compute(
-            sp.split_tokens(params.price, tax_information.tax, 1000))
+        # Calculate the fee amount to pay for the new price
+        fee = sp.compute(
+            sp.split_tokens(params.price, fee_information.fee, 1000))
 
-        # Check if there is some tax to pay
-        with sp.if_(tax > sp.mutez(0)):
+        # Check if there is some fee to pay
+        with sp.if_(fee > sp.mutez(0)):
             # Check that the sender has enough tez in their deposit to pay
             deposit = sp.compute(self.data.deposits.get(sp.sender, sp.mutez(0)))
-            sp.verify(deposit >= tax, message="FA2_INSUFFICIENT_TEZ_BALANCE")
+            sp.verify(deposit >= fee, message="FA2_INSUFFICIENT_TEZ_BALANCE")
 
-            # Subtract the tax from the sender deposit
-            self.data.deposits[sp.sender] = deposit - tax
+            # Subtract the fee from the sender deposit
+            self.data.deposits[sp.sender] = deposit - fee
 
-            # Send the tax to the tax recipient
-            sp.send(tax_information.tax_recipient, tax)
+            # Send the fee to the fee recipient
+            sp.send(fee_information.fee_recipient, fee)
 
-        # Update the tax information
-        self.data.token_tax[params.token_id] = sp.record(
+        # Update the fee information
+        self.data.token_fee[params.token_id] = sp.record(
             price=params.price,
-            tax=tax_information.tax,
-            tax_recipient=tax_information.tax_recipient,
+            fee=fee_information.fee,
+            fee_recipient=fee_information.fee_recipient,
             next_payment=sp.now.add_days(30))
 
         # Update the ledger information
@@ -499,8 +499,8 @@ class HarbergerTaxToken(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TList(sp.TVariant(
-            add_operator=HarbergerTaxToken.OPERATOR_KEY_TYPE,
-            remove_operator=HarbergerTaxToken.OPERATOR_KEY_TYPE)))
+            add_operator=HarbergerToken.OPERATOR_KEY_TYPE,
+            remove_operator=HarbergerToken.OPERATOR_KEY_TYPE)))
 
         # Loop over the list of update operators
         with sp.for_("update_operator", params) as update_operator:
@@ -636,7 +636,7 @@ class HarbergerTaxToken(sp.Contract):
 
         """
         # Define the input parameter data type
-        sp.set_type(params, HarbergerTaxToken.OPERATOR_KEY_TYPE)
+        sp.set_type(params, HarbergerToken.OPERATOR_KEY_TYPE)
 
         # Check that the token exists
         self.check_token_exists(params.token_id)
@@ -659,6 +659,6 @@ class HarbergerTaxToken(sp.Contract):
         sp.result(self.data.token_metadata[token_id])
 
 
-sp.add_compilation_target("harbergerTaxToken", HarbergerTaxToken(
+sp.add_compilation_target("harbergerToken", HarbergerToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
     metadata=sp.utils.metadata_of_url("ipfs://bbb")))
