@@ -122,24 +122,21 @@ class HarbergerToken(sp.Contract):
         """
         sp.verify(token_id < self.data.counter, message="FA2_TOKEN_UNDEFINED")
 
-    def check_has_deposit(self, user):
-        """Checks that the given user has a deposit to pay the fees.
-
-        """
-        sp.verify(self.data.deposits.contains(user),
-                  message="FA2_NO_DEPOSIT")
-
     @sp.entry_point
-    def transfer_to_deposit(self):
-        """Transfers some mutez to the user deposit.
+    def transfer_to_deposit(self, unit):
+        """Transfers some mutez to the sender deposit.
 
         """
+        # Define the input parameter data type
+        sp.set_type(unit, sp.TUnit)
+
+        # Add the transferred amount to the sender deposit
         self.data.deposits[sp.sender] = self.data.deposits.get(
             sp.sender, sp.mutez(0)) + sp.amount
 
     @sp.entry_point
     def withdraw_from_deposit(self, amount):
-        """Withdraws a given amount of mutez from the user deposit.
+        """Withdraws a given amount of mutez from the sender deposit.
 
         """
         # Define the input parameter data type
@@ -148,14 +145,12 @@ class HarbergerToken(sp.Contract):
         # Check that the amount to send is larger than zero
         sp.verify(amount > sp.mutez(0), message="FA2_WRONG_TEZ_AMOUNT")
 
-        # Check that the sender has enough funds
-        deposit_amount = sp.compute(
-            self.data.deposits.get(sp.sender, sp.mutez(0)))
-        sp.verify(deposit_amount >= amount,
-                  message="FA2_INSUFFICIENT_TEZ_BALANCE")
+        # Check that the sender deposit has enough funds
+        deposit = sp.compute(self.data.deposits.get(sp.sender, sp.mutez(0)))
+        sp.verify(deposit >= amount, message="FA2_INSUFFICIENT_TEZ_BALANCE")
 
         # Remove the amount from the sender deposit
-        self.data.deposits[sp.sender] = deposit_amount - amount
+        self.data.deposits[sp.sender] = deposit - amount
 
         # Transfer the tez to the sender
         sp.send(sp.sender, amount)
@@ -179,12 +174,17 @@ class HarbergerToken(sp.Contract):
         # Check that the fee does not exceed 100%
         sp.verify(params.fee <= 1000, message="FA2_INVALID_FEE")
 
-        # Update the big maps
+        # Update the ledger and token metadata big maps
         token_id = sp.compute(self.data.counter)
         self.data.ledger[token_id] = params.creator
         self.data.token_metadata[token_id] = sp.record(
             token_id=token_id,
             token_info=params.metadata)
+
+        # Add the fee information.
+        # The fee recipient is set to the token creator.
+        # The next payment value is not important at this moment, because the
+        # first owner is the fee recipient and they never pay fees
         self.data.token_fee[token_id] = sp.record(
             price=params.price,
             fee=params.fee,
@@ -217,11 +217,8 @@ class HarbergerToken(sp.Contract):
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[params.token_id])
 
-        # Charge the fee if the sender is not the fee recipient
+        # Charge the fee if the owner is not the fee recipient
         with sp.if_(sp.sender != fee_information.fee_recipient):
-            # Check that the owner has a deposit for the fees
-            self.check_has_deposit(sp.sender)
-
             # Calculate the fee amount to pay for the new price
             fee = sp.local("fee",
                 sp.split_tokens(params.price, fee_information.fee, 1000))
@@ -246,11 +243,13 @@ class HarbergerToken(sp.Contract):
             with sp.if_(fee.value > sp.mutez(0)):
                 # Check that the owner has enough tez in their deposit to pay
                 # the fee
-                sp.verify(self.data.deposits[sp.sender] >= fee.value,
-                    message="FA2_INSUFFICIENT_TEZ_BALANCE")
+                deposit = sp.compute(
+                    self.data.deposits.get(sp.sender, sp.mutez(0)))
+                sp.verify(deposit >= fee.value,
+                          message="FA2_INSUFFICIENT_TEZ_BALANCE")
 
-                # Subtract the fee to the owner deposit
-                self.data.deposits[sp.sender] -= fee.value
+                # Subtract the fee from the owner deposit
+                self.data.deposits[sp.sender] = deposit - fee.value
 
                 # Send the fee to the fee recipient
                 sp.send(fee_information.fee_recipient, fee.value)
@@ -279,14 +278,11 @@ class HarbergerToken(sp.Contract):
         # Check that the token exists
         self.check_token_exists(params.token_id)
 
-        # Check that the sender has a deposit for the fees
-        self.check_has_deposit(sp.sender)
-
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[params.token_id])
 
-        # Check that the fee recipient is not the current token owner. The fee
-        # recipient never pays fees
+        # Check that the fee recipient is not the current token owner, since
+        # the fee recipient never pays fees
         sp.verify(fee_information.fee_recipient != self.data.ledger[params.token_id],
                   message="FA2_OWNER_IS_FEE_RECIPIENT")
 
@@ -297,11 +293,12 @@ class HarbergerToken(sp.Contract):
         # Check if there is some fee to pay
         with sp.if_(fee > sp.mutez(0)):
             # Check that the sender has enough tez in their deposit to pay
-            sp.verify(self.data.deposits[sp.sender] >= fee,
-                message="FA2_INSUFFICIENT_TEZ_BALANCE")
+            deposit = sp.compute(self.data.deposits.get(sp.sender, sp.mutez(0)))           
+            sp.verify(deposit >= fee,
+                      message="FA2_INSUFFICIENT_TEZ_BALANCE")
 
             # Subtract the fee from the sender deposit
-            self.data.deposits[sp.sender] -= fee
+            self.data.deposits[sp.sender] = deposit - fee
 
             # Send the fee to the fee recipient
             sp.send(fee_information.fee_recipient, fee)
@@ -329,12 +326,13 @@ class HarbergerToken(sp.Contract):
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[token_id])
 
-        # Check that the fee recipient is not the current token owner. The fee
-        # recipient never pays fees
-        sp.verify(fee_information.fee_recipient != self.data.ledger[token_id],
+        # Check that the fee recipient is not the current token owner, since
+        # the fee recipient never pays fees
+        owner = sp.compute(self.data.ledger[token_id])
+        sp.verify(fee_information.fee_recipient != owner,
                   message="FA2_OWNER_IS_FEE_RECIPIENT")
 
-        # Check if the fee deadline has expired
+        # Check if the deadline to pay the fees has expired
         with sp.if_(sp.now > fee_information.next_payment):
             # Calculate the amount of fees to pay
             montly_payment = sp.split_tokens(
@@ -345,9 +343,9 @@ class HarbergerToken(sp.Contract):
 
             # Check if there is some fee to pay
             with sp.if_(fee > sp.mutez(0)):
-                # Check if owner has enough tez in their deposit to pay
-                owner = sp.compute(self.data.ledger[token_id])
-                deposit = sp.compute(self.data.deposits.get(owner, sp.mutez(0)))
+                # Check if owner has enough tez in their deposit to pay the fee
+                deposit = sp.compute(
+                    self.data.deposits.get(owner, sp.mutez(0)))
 
                 with sp.if_(deposit >= fee):
                     # Subtract the fee from the owners deposit
