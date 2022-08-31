@@ -28,8 +28,10 @@ class HarbergerToken(sp.Contract):
         # The Harberger fee recipient
         fee_recipient=sp.TAddress,
         # The deadline for the next fee payment
-        next_payment=sp.TTimestamp).layout(
-            ("price", ("fee", ("fee_recipient", "next_payment"))))
+        next_payment=sp.TTimestamp,
+        # Flat to indicate that the token is currently on a Dutch auction
+        auction=sp.TBool).layout(
+            ("price", ("fee", ("fee_recipient", ("next_payment", "auction")))))
 
     OPERATOR_KEY_TYPE = sp.TRecord(
         # The token owner
@@ -189,7 +191,8 @@ class HarbergerToken(sp.Contract):
             price=params.price,
             fee=params.fee,
             fee_recipient=params.creator,
-            next_payment=sp.now)
+            next_payment=sp.now,
+            auction=False)
 
         # Increase the tokens counter
         self.data.counter += 1
@@ -216,6 +219,9 @@ class HarbergerToken(sp.Contract):
 
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[params.token_id])
+
+        # Check that the token is not on auction
+        sp.verify(~fee_information.auction, message="FA2_TOKEN_ON_AUCTION")
 
         # Charge the fee if the owner is not the fee recipient
         with sp.if_(sp.sender != fee_information.fee_recipient):
@@ -259,7 +265,8 @@ class HarbergerToken(sp.Contract):
             price=params.price,
             fee=fee_information.fee,
             fee_recipient=fee_information.fee_recipient,
-            next_payment=sp.now.add_days(30))
+            next_payment=sp.now.add_days(30),
+            auction=False)
 
     @sp.entry_point
     def pay_fees(self, params):
@@ -280,6 +287,9 @@ class HarbergerToken(sp.Contract):
 
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[params.token_id])
+
+        # Check that the token is not on auction
+        sp.verify(~fee_information.auction, message="FA2_TOKEN_ON_AUCTION")
 
         # Check that the fee recipient is not the current token owner, since
         # the fee recipient never pays fees
@@ -326,6 +336,9 @@ class HarbergerToken(sp.Contract):
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[token_id])
 
+        # Check that the token is not on auction
+        sp.verify(~fee_information.auction, message="FA2_TOKEN_ON_AUCTION")
+
         # Check that the fee recipient is not the current token owner, since
         # the fee recipient never pays fees
         owner = sp.compute(self.data.ledger[token_id])
@@ -366,8 +379,13 @@ class HarbergerToken(sp.Contract):
                         # Set the owner deposit to zero
                         self.data.deposits[owner] = sp.mutez(0)
 
-                    # Set the token price to zero, so anyone could collect it
-                    self.data.token_fee[token_id].price = sp.mutez(0)
+                    # Put the token on auction
+                    self.data.token_fee[token_id] = sp.record(
+                        price=fee_information.price,
+                        fee=fee_information.fee,
+                        fee_recipient=fee_information.fee_recipient,
+                        next_payment=sp.now,
+                        auction=True)
 
     @sp.entry_point
     def collect(self, params):
@@ -386,8 +404,23 @@ class HarbergerToken(sp.Contract):
         # Get the fee information
         fee_information = sp.compute(self.data.token_fee[params.token_id])
 
-        # Check that the provided tez amount is exactly the token price
-        sp.verify(sp.amount == fee_information.price,
+        # Calculate the token price
+        current_price = sp.local("current_price", fee_information.price)
+
+        with sp.if_(fee_information.auction):
+            # Auctions last 10 days before the price is set to zero
+            running_days = sp.as_nat(
+                (sp.now - fee_information.next_payment)) // (3600 * 24)
+            price_reduction = sp.compute(sp.split_tokens(
+                current_price.value, running_days, 10))
+
+            with sp.if_(price_reduction < current_price.value):
+                current_price.value -= price_reduction
+            with sp.else_():
+                current_price.value = sp.mutez(0)
+
+        # Check that the provided tez amount is exactly the current price
+        sp.verify(sp.amount == current_price.value,
                   message="FA2_WRONG_TEZ_AMOUNT")
 
         # Send the tez to the previous owner
@@ -415,7 +448,8 @@ class HarbergerToken(sp.Contract):
             price=params.price,
             fee=fee_information.fee,
             fee_recipient=fee_information.fee_recipient,
-            next_payment=sp.now.add_days(30))
+            next_payment=sp.now.add_days(30),
+            auction=False)
 
         # Update the ledger information
         self.data.ledger[params.token_id] = sp.sender
