@@ -285,6 +285,11 @@ class HarbergerTaxToken(sp.Contract):
         # Get the tax information
         tax_information = sp.compute(self.data.token_tax[params.token_id])
 
+        # Check that the tax recipient is not the current token owner. The tax
+        # recipient never pays taxes
+        sp.verify(tax_information.tax_recipient != self.data.ledger[params.token_id],
+                  message="FA2_OWNER_IS_TAX_RECIPIENT")
+
         # Calculate the amount of taxes to pay
         tax = sp.compute(sp.mul(params.months, sp.split_tokens(
             tax_information.price, tax_information.tax, 1000)))
@@ -323,6 +328,11 @@ class HarbergerTaxToken(sp.Contract):
 
         # Get the tax information
         tax_information = sp.compute(self.data.token_tax[token_id])
+
+        # Check that the tax recipient is not the current token owner. The tax
+        # recipient never pays taxes
+        sp.verify(tax_information.tax_recipient != self.data.ledger[token_id],
+                  message="FA2_OWNER_IS_TAX_RECIPIENT")
 
         # Check if the tax deadline has expired
         with sp.if_(sp.now > tax_information.next_payment):
