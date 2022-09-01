@@ -442,8 +442,10 @@ class HarbergerFee(sp.Contract):
             next_payment=sp.now.add_seconds(HarbergerFee.FEE_PERIOD_IN_SECONDS),
             auction=False)
 
-        # Approve to pay the fees for this token
+        # Approve to pay the fees for this token and remove the previous owner
+        # approval
         self.data.approved_tokens[(sp.sender, params.token_id)] = sp.unit
+        del self.data.approved_tokens[(token_owner, params.token_id)]
 
         # Transfer the token to the sender, so it becomes the new owner
         transfer_handle = sp.contract(
