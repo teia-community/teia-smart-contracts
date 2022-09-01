@@ -20,19 +20,6 @@ class HarbergerToken(sp.Contract):
         token_info=sp.TMap(sp.TString, sp.TBytes)).layout(
             ("token_id", "token_info"))
 
-    TOKEN_FEE_VALUE_TYPE = sp.TRecord(
-        # The current price set by the token owner
-        price=sp.TMutez,
-        # The Harberger fee in per mile
-        fee=sp.TNat,
-        # The Harberger fee recipient
-        fee_recipient=sp.TAddress,
-        # The deadline for the next fee payment
-        next_payment=sp.TTimestamp,
-        # Flat to indicate that the token is currently on a Dutch auction
-        auction=sp.TBool).layout(
-            ("price", ("fee", ("fee_recipient", ("next_payment", "auction")))))
-
     OPERATOR_KEY_TYPE = sp.TRecord(
         # The token owner
         owner=sp.TAddress,
@@ -41,6 +28,19 @@ class HarbergerToken(sp.Contract):
         # The token id
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
+
+    TOKEN_FEE_TYPE = sp.TRecord(
+        # The price set by the token owner
+        price=sp.TMutez,
+        # The Harberger fee in per mile
+        fee=sp.TNat,
+        # The Harberger fee recipient
+        fee_recipient=sp.TAddress,
+        # The deadline for the next fee payment
+        next_payment=sp.TTimestamp,
+        # Flag that indicates if the token is currently on a Dutch auction
+        auction=sp.TBool).layout(
+            ("price", ("fee", ("fee_recipient", ("next_payment", "auction")))))
 
     def __init__(self, administrator, metadata):
         """Initializes the contract.
@@ -52,18 +52,15 @@ class HarbergerToken(sp.Contract):
             administrator=sp.TAddress,
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
+            # The fees contract address
+            fees_contract=sp.TOption(sp.TAddress),
             # The ledger big map where the tokens owners are listed
             ledger=sp.TBigMap(sp.TNat, sp.TAddress),
             # The big map with the tokens metadata
             token_metadata=sp.TBigMap(
                 sp.TNat, HarbergerToken.TOKEN_METADATA_VALUE_TYPE),
-            # The big map with the tokens fee information
-            token_fee=sp.TBigMap(
-                sp.TNat, HarbergerToken.TOKEN_FEE_VALUE_TYPE),
             # The big map with the tokens operators
             operators=sp.TBigMap(HarbergerToken.OPERATOR_KEY_TYPE, sp.TUnit),
-            # The big map with the token owners deposits to pay the fees
-            deposits=sp.TBigMap(sp.TAddress, sp.TMutez),
             # The proposed new administrator address
             proposed_administrator=sp.TOption(sp.TAddress),
             # A counter that tracks the total number of tokens minted so far
@@ -73,11 +70,10 @@ class HarbergerToken(sp.Contract):
         self.init(
             administrator=administrator,
             metadata=metadata,
+            fees_contract=sp.none,
             ledger=sp.big_map(),
             token_metadata=sp.big_map(),
-            token_fee=sp.big_map(),
             operators=sp.big_map(),
-            deposits=sp.big_map(),
             proposed_administrator=sp.none,
             counter=0)
 
@@ -101,7 +97,8 @@ class HarbergerToken(sp.Contract):
                 self.total_supply,
                 self.all_tokens,
                 self.is_operator,
-                self.token_metadata],
+                self.token_metadata,
+                self.token_owner],
             "permissions": {
                 "operator": "owner-or-operator-transfer",
                 "receiver": "owner-no-hook",
@@ -125,39 +122,6 @@ class HarbergerToken(sp.Contract):
         sp.verify(token_id < self.data.counter, message="FA2_TOKEN_UNDEFINED")
 
     @sp.entry_point
-    def transfer_to_deposit(self, unit):
-        """Transfers some mutez to the sender deposit.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(unit, sp.TUnit)
-
-        # Add the transferred amount to the sender deposit
-        self.data.deposits[sp.sender] = self.data.deposits.get(
-            sp.sender, sp.mutez(0)) + sp.amount
-
-    @sp.entry_point
-    def withdraw_from_deposit(self, amount):
-        """Withdraws a given amount of mutez from the sender deposit.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(amount, sp.TMutez)
-
-        # Check that the amount to send is larger than zero
-        sp.verify(amount > sp.mutez(0), message="FA2_WRONG_TEZ_AMOUNT")
-
-        # Check that the sender deposit has enough funds
-        deposit = sp.compute(self.data.deposits.get(sp.sender, sp.mutez(0)))
-        sp.verify(deposit >= amount, message="FA2_INSUFFICIENT_TEZ_BALANCE")
-
-        # Remove the amount from the sender deposit
-        self.data.deposits[sp.sender] = deposit - amount
-
-        # Transfer the tez to the sender
-        sp.send(sp.sender, amount)
-
-    @sp.entry_point
     def mint(self, params):
         """Mints a new token.
 
@@ -173,9 +137,6 @@ class HarbergerToken(sp.Contract):
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Check that the fee does not exceed 100%
-        sp.verify(params.fee <= 1000, message="FA2_INVALID_FEE")
-
         # Update the ledger and token metadata big maps
         token_id = sp.compute(self.data.counter)
         self.data.ledger[token_id] = params.creator
@@ -183,276 +144,24 @@ class HarbergerToken(sp.Contract):
             token_id=token_id,
             token_info=params.metadata)
 
-        # Add the fee information.
-        # The fee recipient is set to the token creator.
-        # The next payment value is not important at this moment, because the
-        # first owner is the fee recipient and they never pay fees
-        self.data.token_fee[token_id] = sp.record(
-            price=params.price,
-            fee=params.fee,
-            fee_recipient=params.creator,
-            next_payment=sp.now,
-            auction=False)
+        # Send the fee information to the fees contract
+        add_fee_handle = sp.contract(
+            t=HarbergerToken.TOKEN_FEE_TYPE,
+            address=self.data.fees_contract.open_some(
+                message="FA2_UNDEFINED_FEES_CONTRACT"),
+            entry_point="add_fee").open_some()
+        sp.transfer(
+            arg=sp.record(
+                price=params.price,
+                fee=params.fee,
+                fee_recipient=params.creator,
+                next_payment=sp.now,
+                auction=False),
+            amount=sp.mutez(0),
+            destination=add_fee_handle)
 
         # Increase the tokens counter
         self.data.counter += 1
-
-    @sp.entry_point
-    def set_price(self, params):
-        """Sets a new price for the token.
-
-        Before updating the price all remaining fees need to be paid.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            token_id=sp.TNat,
-            price=sp.TMutez).layout(
-                ("token_id", "price")))
-
-        # Check that the token exists
-        self.check_token_exists(params.token_id)
-
-        # Check that the sender is the token owner
-        sp.verify(sp.sender == self.data.ledger[params.token_id],
-                  message="FA2_SENDER_IS_NOT_OWNER")
-
-        # Get the fee information
-        fee_information = sp.compute(self.data.token_fee[params.token_id])
-
-        # Check that the token is not on auction
-        sp.verify(~fee_information.auction, message="FA2_TOKEN_ON_AUCTION")
-
-        # Charge the fee if the owner is not the fee recipient
-        with sp.if_(sp.sender != fee_information.fee_recipient):
-            # Calculate the fee amount to pay for the new price
-            fee = sp.local("fee",
-                sp.split_tokens(params.price, fee_information.fee, 1000))
-
-            # Calculate the remaining fee amount from the old price
-            montly_payment = sp.split_tokens(
-                fee_information.price, fee_information.fee, 1000)
-            remaining_fee = sp.compute(sp.split_tokens(
-                montly_payment, abs(sp.now - fee_information.next_payment),
-                3600 * 24 * 30))
-
-            # Combine the two fees
-            with sp.if_(sp.now < fee_information.next_payment):
-                with sp.if_(fee.value > remaining_fee):
-                    fee.value -= remaining_fee
-                with sp.else_():
-                    fee.value = sp.mutez(0)
-            with sp.else_():
-                fee.value += remaining_fee
-
-            # Check if there is some fee to pay
-            with sp.if_(fee.value > sp.mutez(0)):
-                # Check that the owner has enough tez in their deposit to pay
-                # the fee
-                deposit = sp.compute(
-                    self.data.deposits.get(sp.sender, sp.mutez(0)))
-                sp.verify(deposit >= fee.value,
-                          message="FA2_INSUFFICIENT_TEZ_BALANCE")
-
-                # Subtract the fee from the owner deposit
-                self.data.deposits[sp.sender] = deposit - fee.value
-
-                # Send the fee to the fee recipient
-                sp.send(fee_information.fee_recipient, fee.value)
-
-        # Update the fee information
-        self.data.token_fee[params.token_id] = sp.record(
-            price=params.price,
-            fee=fee_information.fee,
-            fee_recipient=fee_information.fee_recipient,
-            next_payment=sp.now.add_days(30),
-            auction=False)
-
-    @sp.entry_point
-    def pay_fees(self, params):
-        """Pays the fees associated to a given token.
-
-        Any user can pay the fees of a given token. They don't need to own the
-        token.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            token_id=sp.TNat,
-            months=sp.TNat).layout(
-                ("token_id", "months")))
-
-        # Check that the token exists
-        self.check_token_exists(params.token_id)
-
-        # Get the fee information
-        fee_information = sp.compute(self.data.token_fee[params.token_id])
-
-        # Check that the token is not on auction
-        sp.verify(~fee_information.auction, message="FA2_TOKEN_ON_AUCTION")
-
-        # Check that the fee recipient is not the current token owner, since
-        # the fee recipient never pays fees
-        sp.verify(fee_information.fee_recipient != self.data.ledger[params.token_id],
-                  message="FA2_OWNER_IS_FEE_RECIPIENT")
-
-        # Calculate the amount of fees to pay
-        fee = sp.compute(sp.mul(params.months, sp.split_tokens(
-            fee_information.price, fee_information.fee, 1000)))
-
-        # Check if there is some fee to pay
-        with sp.if_(fee > sp.mutez(0)):
-            # Check that the sender has enough tez in their deposit to pay
-            deposit = sp.compute(self.data.deposits.get(sp.sender, sp.mutez(0)))           
-            sp.verify(deposit >= fee,
-                      message="FA2_INSUFFICIENT_TEZ_BALANCE")
-
-            # Subtract the fee from the sender deposit
-            self.data.deposits[sp.sender] = deposit - fee
-
-            # Send the fee to the fee recipient
-            sp.send(fee_information.fee_recipient, fee)
-
-        # Update the deadline for the next payment
-        self.data.token_fee[params.token_id].next_payment = fee_information.next_payment.add_days(
-            sp.mul(params.months, 30))
-
-    @sp.entry_point
-    def apply_fees(self, token_id):
-        """Applies the fees associated to a given token.
-
-        Anyone can call this entrypoint.
-
-        If the owner does not have enough tez in their deposit to pay the fees,
-        the token price is set to zero, and could be collected by anyone.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(token_id, sp.TNat)
-
-        # Check that the token exists
-        self.check_token_exists(token_id)
-
-        # Get the fee information
-        fee_information = sp.compute(self.data.token_fee[token_id])
-
-        # Check that the token is not on auction
-        sp.verify(~fee_information.auction, message="FA2_TOKEN_ON_AUCTION")
-
-        # Check that the fee recipient is not the current token owner, since
-        # the fee recipient never pays fees
-        owner = sp.compute(self.data.ledger[token_id])
-        sp.verify(fee_information.fee_recipient != owner,
-                  message="FA2_OWNER_IS_FEE_RECIPIENT")
-
-        # Check if the deadline to pay the fees has expired
-        with sp.if_(sp.now > fee_information.next_payment):
-            # Calculate the amount of fees to pay
-            montly_payment = sp.split_tokens(
-                fee_information.price, fee_information.fee, 1000)
-            months_to_pay = sp.compute(1 + (
-                sp.as_nat(sp.now - fee_information.next_payment) // sp.nat(3600 * 24 * 30)))
-            fee = sp.compute(sp.mul(months_to_pay, montly_payment))
-
-            # Check if there is some fee to pay
-            with sp.if_(fee > sp.mutez(0)):
-                # Check if owner has enough tez in their deposit to pay the fee
-                deposit = sp.compute(
-                    self.data.deposits.get(owner, sp.mutez(0)))
-
-                with sp.if_(deposit >= fee):
-                    # Subtract the fee from the owners deposit
-                    self.data.deposits[owner] = deposit - fee
-
-                    # Send the fee to the fee recipient
-                    sp.send(fee_information.fee_recipient, fee)
-
-                    # Update the deadline for the next payment
-                    self.data.token_fee[token_id].next_payment = fee_information.next_payment.add_days(
-                        sp.mul(months_to_pay, 30))
-                with sp.else_():
-                    with sp.if_(deposit > sp.mutez(0)):
-                        # Send whatever is available in the owner deposit to the
-                        # fee recipient
-                        sp.send(fee_information.fee_recipient, deposit)
-
-                        # Set the owner deposit to zero
-                        self.data.deposits[owner] = sp.mutez(0)
-
-                    # Put the token on auction
-                    self.data.token_fee[token_id] = sp.record(
-                        price=fee_information.price,
-                        fee=fee_information.fee,
-                        fee_recipient=fee_information.fee_recipient,
-                        next_payment=sp.now,
-                        auction=True)
-
-    @sp.entry_point
-    def collect(self, params):
-        """Collects a given token and sets a new price for it.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            token_id=sp.TNat,
-            price=sp.TMutez).layout(
-                ("token_id", "price")))
-
-        # Check that the token exists
-        self.check_token_exists(params.token_id)
-
-        # Get the fee information
-        fee_information = sp.compute(self.data.token_fee[params.token_id])
-
-        # Calculate the token price
-        current_price = sp.local("current_price", fee_information.price)
-
-        with sp.if_(fee_information.auction):
-            # Auctions last 10 days before the price is set to zero
-            running_days = sp.as_nat(
-                (sp.now - fee_information.next_payment)) // (3600 * 24)
-            price_reduction = sp.compute(sp.split_tokens(
-                current_price.value, running_days, 10))
-
-            with sp.if_(price_reduction < current_price.value):
-                current_price.value -= price_reduction
-            with sp.else_():
-                current_price.value = sp.mutez(0)
-
-        # Check that the provided tez amount is exactly the current price
-        sp.verify(sp.amount == current_price.value,
-                  message="FA2_WRONG_TEZ_AMOUNT")
-
-        # Send the tez to the previous owner
-        with sp.if_(sp.amount > sp.mutez(0)):
-            sp.send(self.data.ledger[params.token_id], sp.amount)
-
-        # Calculate the fee amount to pay for the new price
-        fee = sp.compute(
-            sp.split_tokens(params.price, fee_information.fee, 1000))
-
-        # Check if there is some fee to pay
-        with sp.if_(fee > sp.mutez(0)):
-            # Check that the sender has enough tez in their deposit to pay
-            deposit = sp.compute(self.data.deposits.get(sp.sender, sp.mutez(0)))
-            sp.verify(deposit >= fee, message="FA2_INSUFFICIENT_TEZ_BALANCE")
-
-            # Subtract the fee from the sender deposit
-            self.data.deposits[sp.sender] = deposit - fee
-
-            # Send the fee to the fee recipient
-            sp.send(fee_information.fee_recipient, fee)
-
-        # Update the fee information
-        self.data.token_fee[params.token_id] = sp.record(
-            price=params.price,
-            fee=fee_information.fee,
-            fee_recipient=fee_information.fee_recipient,
-            next_payment=sp.now.add_days(30),
-            auction=False)
-
-        # Update the ledger information
-        self.data.ledger[params.token_id] = sp.sender
 
     @sp.entry_point
     def transfer(self, params):
@@ -478,8 +187,11 @@ class HarbergerToken(sp.Contract):
 
                 # Check that the sender is one of the token operators
                 owner = sp.compute(transfer.from_)
+                fees_contract = self.data.fees_contract.open_some(
+                    message="FA2_UNDEFINED_FEES_CONTRACT")
                 sp.verify(
                     (sp.sender == owner) | 
+                    (sp.sender == fees_contract) | 
                     self.data.operators.contains(sp.record(
                         owner=owner,
                         operator=sp.sender,
@@ -580,7 +292,7 @@ class HarbergerToken(sp.Contract):
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            message="FA_NO_NEW_ADMIN"), message="FA_NOT_PROPOSED_ADMIN")
+            message="FA2_NO_NEW_ADMIN"), message="FA2_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender
@@ -603,6 +315,26 @@ class HarbergerToken(sp.Contract):
 
         # Update the contract metadata
         self.data.metadata[params.k] = params.v
+
+    @sp.entry_point
+    def set_fees_contract(self, fees_contract):
+        """Sets the contract that will administer the token fees.
+
+        For security reasons, the fees contract can only be set once.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(fees_contract, sp.TAddress)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Check that fees contract has not been set before
+        sp.verify(~self.data.fees_contract.is_some(),
+                  message="FA2_FEES_CONTRACT_IS_ALREADY_SET")
+
+        # Set the fees contract address
+        self.data.fees_contract = sp.some(fees_contract)
 
     @sp.onchain_view(pure=True)
     def token_exists(self, token_id):
@@ -653,7 +385,7 @@ class HarbergerToken(sp.Contract):
         self.check_token_exists(token_id)
 
         # Return the token total supply
-        sp.result(1)
+        sp.result(sp.nat(1))
 
     @sp.onchain_view(pure=True)
     def all_tokens(self):
@@ -689,6 +421,20 @@ class HarbergerToken(sp.Contract):
 
         # Return the token metadata
         sp.result(self.data.token_metadata[token_id])
+
+    @sp.onchain_view(pure=True)
+    def token_owner(self, token_id):
+        """Returns the token owner.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_id, sp.TNat)
+
+        # Check that the token exists
+        self.check_token_exists(token_id)
+
+        # Return the token owner
+        sp.result(self.data.ledger[token_id])
 
 
 sp.add_compilation_target("harbergerToken", HarbergerToken(

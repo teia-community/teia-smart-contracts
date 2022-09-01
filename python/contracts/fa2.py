@@ -298,7 +298,7 @@ class FA2(sp.Contract):
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            message="FA_NO_NEW_ADMIN"), message="FA_NOT_PROPOSED_ADMIN")
+            message="FA2_NO_NEW_ADMIN"), message="FA2_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender
