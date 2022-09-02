@@ -55,11 +55,25 @@ class HarbergerFee(sp.Contract):
             approved_tokens=sp.big_map(),
             proposed_administrator=sp.none)
 
+    def check_no_tez_transfer(self):
+        """Checks that no tez were transferred in the operation.
+
+        """
+        sp.verify(sp.amount == sp.tez(0), message="HFEE_TEZ_TRANSFER")
+
     def get_deposit(self, user):
         """Gets amount of mutez in the user deposit.
 
         """
         return self.data.deposits.get(user, sp.mutez(0))
+
+    def check_is_administrator(self):
+        """Checks that the address that called the entry point is the contract
+        administrator.
+
+        """
+        sp.verify(sp.sender == self.data.administrator,
+                  message="HFEE_NOT_ADMIN")
 
     def check_is_token_contract(self):
         """Checks that the address that called the entry point is the token
@@ -110,6 +124,20 @@ class HarbergerFee(sp.Contract):
             self.data.administrator) + sp.amount
 
     @sp.entry_point
+    def set_delegate(self, baker):
+        """Delegates the tez stored in the contract to the given baker.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(baker, sp.TOption(sp.TKeyHash))
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Set the new delegate
+        sp.set_delegate(baker)
+
+    @sp.entry_point
     def transfer_to_deposit(self, unit):
         """Transfers some mutez to the sender deposit.
 
@@ -127,6 +155,9 @@ class HarbergerFee(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(amount, sp.TMutez)
+
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
 
         # Check that the amount to withdraw is larger than zero
         sp.verify(amount > sp.mutez(0), message="HFEE_WRONG_TEZ_AMOUNT")
@@ -173,6 +204,9 @@ class HarbergerFee(sp.Contract):
             approval=sp.TBool).layout(
                 ("token_id", "approval")))
 
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
+
         # Add or remove the token approval
         with sp.if_(params.approval):
             self.data.approved_tokens[(sp.sender, params.token_id)] = sp.unit
@@ -192,6 +226,9 @@ class HarbergerFee(sp.Contract):
             token_id=sp.TNat,
             price=sp.TMutez).layout(
                 ("token_id", "price")))
+
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
 
         # Check that the token exists
         self.check_token_exists(params.token_id)
@@ -266,6 +303,9 @@ class HarbergerFee(sp.Contract):
             months=sp.TNat).layout(
                 ("token_id", "months")))
 
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
+
         # Check that the token exists
         self.check_token_exists(params.token_id)
 
@@ -314,6 +354,9 @@ class HarbergerFee(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(token_id, sp.TNat)
+
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
 
         # Check that the token exists
         self.check_token_exists(token_id)
@@ -466,6 +509,52 @@ class HarbergerFee(sp.Contract):
                     amount=1)]))]),
             amount=sp.mutez(0),
             destination=transfer_handle)
+
+    @sp.entry_point
+    def transfer_administrator(self, proposed_administrator):
+        """Proposes to transfer the contract administrator to another address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(proposed_administrator, sp.TAddress)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Set the new proposed administrator address
+        self.data.proposed_administrator = sp.some(proposed_administrator)
+
+    @sp.entry_point
+    def accept_administrator(self):
+        """The proposed administrator accepts the contract administrator
+        responsibilities.
+
+        """
+        # Check that the proposed administrator executed the entry point
+        sp.verify(sp.sender == self.data.proposed_administrator.open_some(
+            message="FA2_NO_NEW_ADMIN"), message="FA2_NOT_PROPOSED_ADMIN")
+
+        # Set the new administrator address
+        self.data.administrator = sp.sender
+
+        # Reset the proposed administrator value
+        self.data.proposed_administrator = sp.none
+
+    @sp.entry_point
+    def set_metadata(self, params):
+        """Updates the contract metadata.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(params, sp.TRecord(
+            k=sp.TString,
+            v=sp.TBytes).layout(("k", "v")))
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Update the contract metadata
+        self.data.metadata[params.k] = params.v
 
 
 sp.add_compilation_target("harbergerFee", HarbergerFee(
