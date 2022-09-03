@@ -13,12 +13,6 @@ class SubscriptionToken(sp.Contract):
 
     """
 
-    LEDGER_KEY_TYPE = sp.TPair(
-        # The owner of the token editions
-        sp.TAddress,
-        # The token id
-        sp.TNat)
-
     TOKEN_METADATA_VALUE_TYPE = sp.TRecord(
         # The token id
         token_id=sp.TNat,
@@ -27,28 +21,24 @@ class SubscriptionToken(sp.Contract):
             ("token_id", "token_info"))
 
     OPERATOR_KEY_TYPE = sp.TRecord(
-        # The owner of the token editions
+        # The token owner
         owner=sp.TAddress,
-        # The operator allowed by the owner to transfer their token editions
+        # The operator allowed by the owner to transfer their token
         operator=sp.TAddress,
         # The token id
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
 
-    TOKEN_FEE_TYPE = sp.TRecord(
-        # The constant fee in mutez
+    COLLECTION_FEE_TYPE = sp.TRecord(
+        # The fee in mutez
         fee=sp.TMutez,
         # The fee payment interval in days
         interval=sp.TNat,
         # The fee recipient
         recipient=sp.TAddress,
-        # The deadline for the next fee payment
-        next_payment=sp.TTimestamp,
-        # The date when the owner doesn't need to pay the fee anymore
-        end_date=sp.TOption(sp.TTimestamp),
-        # Flag that indicates if the token is currently on a Dutch auction
-        auction=sp.TBool).layout(
-            ("fee", ("recipient", ("interval", ("next_payment", ("end_date", "auction"))))))
+        # The date when the fee doesn't need to be paid anymore
+        end_date=sp.TOption(sp.TTimestamp)).layout(
+            ("fee", ("interval", ("recipient", "end_date"))))
 
     def __init__(self, administrator, metadata):
         """Initializes the contract.
@@ -63,12 +53,12 @@ class SubscriptionToken(sp.Contract):
             # The fees contract address
             fees_contract=sp.TOption(sp.TAddress),
             # The ledger big map where the tokens owners are listed
-            ledger=sp.TBigMap(SubscriptionToken.LEDGER_KEY_TYPE, sp.TNat),
-            # The tokens total supply
-            supply=sp.TBigMap(sp.TNat, sp.TNat),
+            ledger=sp.TBigMap(sp.TNat, sp.TAddress),
             # The big map with the tokens metadata
             token_metadata=sp.TBigMap(
                 sp.TNat, SubscriptionToken.TOKEN_METADATA_VALUE_TYPE),
+            # The big map with the collection id associates to each token
+            token_collection=sp.TBigMap(sp.TNat, sp.TNat),
             # The big map with the tokens operators
             operators=sp.TBigMap(SubscriptionToken.OPERATOR_KEY_TYPE, sp.TUnit),
             # The proposed new administrator address
@@ -82,8 +72,8 @@ class SubscriptionToken(sp.Contract):
             metadata=metadata,
             fees_contract=sp.none,
             ledger=sp.big_map(),
-            supply=sp.big_map(),
             token_metadata=sp.big_map(),
+            token_collection=sp.big_map(),
             operators=sp.big_map(),
             proposed_administrator=sp.none,
             counter=0)
@@ -108,7 +98,9 @@ class SubscriptionToken(sp.Contract):
                 self.total_supply,
                 self.all_tokens,
                 self.is_operator,
-                self.token_metadata],
+                self.token_metadata,
+                self.token_collection,
+                self.token_owner],
             "permissions": {
                 "operator": "owner-or-operator-transfer",
                 "receiver": "owner-no-hook",
@@ -138,41 +130,36 @@ class SubscriptionToken(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
-            creator=sp.TAddress,
-            amount=sp.TNat,
+            minter=sp.TAddress,
             metadata=sp.TMap(sp.TString, sp.TBytes),
-            fee=sp.TMutez,
-            interval=sp.TNat,
-            end_date=sp.TOption(sp.TTimestamp)).layout(
-                ("creator", ("amount", ("metadata", ("fee", ("interval", "end_date")))))))
+            collection_id=sp.TNat).layout(
+                ("minter", ("metadata", "collection_id"))))
 
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Update the big maps
+        # Update the ledger, token metadata and collections big maps
         token_id = sp.compute(self.data.counter)
-        self.data.ledger[(params.creator, token_id)] = params.amount
-        self.data.supply[token_id] = params.amount
+        self.data.ledger[token_id] = params.minter
         self.data.token_metadata[token_id] = sp.record(
             token_id=token_id,
             token_info=params.metadata)
+        self.data.token_collection[token_id] = params.collection_id
 
-        # Send the fee information to the fees contract
-        add_fee_handle = sp.contract(
-            t=SubscriptionToken.TOKEN_FEE_TYPE,
+        # Send the token information to the fees contract
+        add_token_handle = sp.contract(
+            t=sp.TRecord(
+                token_id=sp.TNat,
+                collection_id=sp.TNat).layout(("token_id", "collection_id")),
             address=self.data.fees_contract.open_some(
                 message="FA2_UNDEFINED_FEES_CONTRACT"),
-            entry_point="add_fee").open_some()
+            entry_point="add_token").open_some()
         sp.transfer(
             arg=sp.record(
-                fee=params.fee,
-                interval=params.interval,
-                recipient=params.creator,
-                next_payment=sp.now,
-                end_date=params.end_date,
-                auction=False),
+                token_id=token_id,
+                collection_id=params.collection_id),
             amount=sp.mutez(0),
-            destination=add_fee_handle)
+            destination=add_token_handle)
 
         # Increase the tokens counter
         self.data.counter += 1
@@ -214,16 +201,12 @@ class SubscriptionToken(sp.Contract):
 
                 # Check that the transfer amount is not zero
                 with sp.if_(tx.amount > 0):
-                    # Remove the token amount from the owner
-                    owner_key = sp.pair(owner, token_id)
-                    self.data.ledger[owner_key] = sp.as_nat(
-                        self.data.ledger.get(owner_key, 0) - tx.amount,
-                        "FA2_INSUFFICIENT_BALANCE")
+                    # Check that the owner really owns the token
+                    sp.verify(self.data.ledger[token_id] == owner,
+                              message="FA2_INSUFFICIENT_BALANCE")
 
-                    # Add the token amount to the new owner
-                    new_owner_key = sp.pair(tx.to_, token_id)
-                    self.data.ledger[new_owner_key] = self.data.ledger.get(
-                        new_owner_key, 0) + tx.amount
+                    # Set the new token owner
+                    self.data.ledger[token_id] = tx.to_
 
     @sp.entry_point
     def balance_of(self, params):
@@ -246,10 +229,10 @@ class SubscriptionToken(sp.Contract):
             self.check_token_exists(request.token_id)
 
             # Return the owner token balance
-            sp.result(sp.record(
-                request=request,
-                balance=self.data.ledger.get(
-                    (request.owner, request.token_id), 0)))
+            with sp.if_(self.data.ledger[request.token_id] == request.owner):
+                sp.result(sp.record(request=request, balance=1))
+            with sp.else_():
+                sp.result(sp.record(request=request, balance=0))
 
         sp.transfer(
             params.requests.map(process_request), sp.mutez(0), params.callback)
@@ -386,7 +369,10 @@ class SubscriptionToken(sp.Contract):
         self.check_token_exists(params.token_id)
 
         # Return the owner token balance
-        sp.result(self.data.ledger.get((params.owner, params.token_id), 0))
+        with sp.if_(self.data.ledger[params.token_id] == params.owner):
+            sp.result(sp.nat(1))
+        with sp.else_():
+            sp.result(sp.nat(0))
 
     @sp.onchain_view(pure=True)
     def total_supply(self, token_id):
@@ -400,7 +386,7 @@ class SubscriptionToken(sp.Contract):
         self.check_token_exists(token_id)
 
         # Return the token total supply
-        sp.result(self.data.supply.get(token_id, 0))
+        sp.result(sp.nat(1))
 
     @sp.onchain_view(pure=True)
     def all_tokens(self):
@@ -437,7 +423,35 @@ class SubscriptionToken(sp.Contract):
         # Return the token metadata
         sp.result(self.data.token_metadata[token_id])
 
+    @sp.onchain_view(pure=True)
+    def token_collection(self, token_id):
+        """Returns the token collection id.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_id, sp.TNat)
+
+        # Check that the token exists
+        self.check_token_exists(token_id)
+
+        # Return the token collection id
+        sp.result(self.data.token_collection[token_id])
+
+    @sp.onchain_view(pure=True)
+    def token_owner(self, token_id):
+        """Returns the token owner.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_id, sp.TNat)
+
+        # Check that the token exists
+        self.check_token_exists(token_id)
+
+        # Return the token owner
+        sp.result(self.data.ledger[token_id])
+
 
 sp.add_compilation_target("subscriptionToken", SubscriptionToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
-    metadata=sp.utils.metadata_of_url("ipfs://aaa")))
+    metadata=sp.utils.metadata_of_url("ipfs://bbb")))

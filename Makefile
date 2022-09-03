@@ -75,6 +75,7 @@ compile_all:
 	$(call COMPILE, harbergerToken)
 	$(call COMPILE, harbergerFee)
 	$(call COMPILE, subscriptionToken)
+	$(call COMPILE, subscriptionFee)
 
 test_all:
 	$(call TEST, teiaMarketplace_v1)

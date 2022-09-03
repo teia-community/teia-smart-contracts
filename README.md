@@ -16,6 +16,7 @@
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
 | [Subscription token](python/contracts/subscriptionToken.py) | | Prototype |
+| [Subscription fee](python/contracts/subscriptionFee.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -44,6 +45,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py ../output/contracts/harbergerToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py ../output/contracts/harbergerFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionToken.py ../output/contracts/subscriptionToken --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/subscriptionFee.py ../output/contracts/subscriptionFee --html --purge
 ```
 
 ## Execute the tests

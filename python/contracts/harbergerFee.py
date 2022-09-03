@@ -62,7 +62,7 @@ class HarbergerFee(sp.Contract):
         sp.verify(sp.amount == sp.mutez(0), message="HFEE_TEZ_TRANSFER")
 
     def get_deposit(self, user):
-        """Gets amount of mutez in the user deposit.
+        """Gets the amount of mutez in the user deposit.
 
         """
         return self.data.deposits.get(user, sp.mutez(0))
