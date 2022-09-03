@@ -11,4 +11,7 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py /tmp/contracts/daoGovernance
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py /tmp/contracts/daoTreasury
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py /tmp/contracts/representatives
+~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py /tmp/contracts/harbergerToken
+~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py /tmp/contracts/harbergerFee
+~/smartpy-cli/SmartPy.sh compile contracts/subscriptionToken.py /tmp/contracts/subscriptionToken
 cd - > /dev/null

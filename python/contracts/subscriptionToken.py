@@ -1,9 +1,9 @@
 import smartpy as sp
 
 
-class HarbergerToken(sp.Contract):
+class SubscriptionToken(sp.Contract):
     """This contract extends the FA2 contract template example in smartpy.io
-    v0.9.1 to apply a Harberger fee to the token owners.
+    v0.9.1 to apply a constant subscription fee to the token owners.
 
     The FA2 template was originally developed by Seb Mondet:
     https://gitlab.com/smondet/fa2-smartpy
@@ -13,6 +13,12 @@ class HarbergerToken(sp.Contract):
 
     """
 
+    LEDGER_KEY_TYPE = sp.TPair(
+        # The owner of the token editions
+        sp.TAddress,
+        # The token id
+        sp.TNat)
+
     TOKEN_METADATA_VALUE_TYPE = sp.TRecord(
         # The token id
         token_id=sp.TNat,
@@ -21,26 +27,28 @@ class HarbergerToken(sp.Contract):
             ("token_id", "token_info"))
 
     OPERATOR_KEY_TYPE = sp.TRecord(
-        # The token owner
+        # The owner of the token editions
         owner=sp.TAddress,
-        # The operator allowed by the owner to transfer their token
+        # The operator allowed by the owner to transfer their token editions
         operator=sp.TAddress,
         # The token id
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
 
     TOKEN_FEE_TYPE = sp.TRecord(
-        # The price set by the token owner
-        price=sp.TMutez,
-        # The Harberger fee in per mile
-        fee=sp.TNat,
-        # The Harberger fee recipient
+        # The constant fee in mutez
+        fee=sp.TMutez,
+        # The fee payment interval in days
+        interval=sp.TNat,
+        # The fee recipient
         recipient=sp.TAddress,
         # The deadline for the next fee payment
         next_payment=sp.TTimestamp,
+        # The date when the owner doesn't need to pay the fee anymore
+        end_date=sp.TOption(sp.TTimestamp),
         # Flag that indicates if the token is currently on a Dutch auction
         auction=sp.TBool).layout(
-            ("price", ("fee", ("recipient", ("next_payment", "auction")))))
+            ("fee", ("recipient", ("interval", ("next_payment", ("end_date", "auction"))))))
 
     def __init__(self, administrator, metadata):
         """Initializes the contract.
@@ -55,12 +63,14 @@ class HarbergerToken(sp.Contract):
             # The fees contract address
             fees_contract=sp.TOption(sp.TAddress),
             # The ledger big map where the tokens owners are listed
-            ledger=sp.TBigMap(sp.TNat, sp.TAddress),
+            ledger=sp.TBigMap(SubscriptionToken.LEDGER_KEY_TYPE, sp.TNat),
+            # The tokens total supply
+            supply=sp.TBigMap(sp.TNat, sp.TNat),
             # The big map with the tokens metadata
             token_metadata=sp.TBigMap(
-                sp.TNat, HarbergerToken.TOKEN_METADATA_VALUE_TYPE),
+                sp.TNat, SubscriptionToken.TOKEN_METADATA_VALUE_TYPE),
             # The big map with the tokens operators
-            operators=sp.TBigMap(HarbergerToken.OPERATOR_KEY_TYPE, sp.TUnit),
+            operators=sp.TBigMap(SubscriptionToken.OPERATOR_KEY_TYPE, sp.TUnit),
             # The proposed new administrator address
             proposed_administrator=sp.TOption(sp.TAddress),
             # A counter that tracks the total number of tokens minted so far
@@ -72,6 +82,7 @@ class HarbergerToken(sp.Contract):
             metadata=metadata,
             fees_contract=sp.none,
             ledger=sp.big_map(),
+            supply=sp.big_map(),
             token_metadata=sp.big_map(),
             operators=sp.big_map(),
             proposed_administrator=sp.none,
@@ -80,16 +91,16 @@ class HarbergerToken(sp.Contract):
         # Build the TZIP-016 contract metadata
         # This is helpful to get the off-chain views code in json format
         contract_metadata = {
-            "name": "Extended FA2 template contract with a Harberger fee",
+            "name": "Extended FA2 template contract with a subscription fee",
             "description": "This contract extends the FA2 contract template "
-            "example in smartpy.io v0.9.1 to apply a Harberger fee to the "
+            "example in smartpy.io v0.9.1 to apply a subscription fee to the "
             "token owners",
             "version": "v1.0.0",
             "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
             "homepage": "https://teia.art",
             "source": {
                 "tools": ["SmartPy 0.9.1"],
-                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/harbergerToken.py"
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/subscriptionToken.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
             "views": [
@@ -97,8 +108,7 @@ class HarbergerToken(sp.Contract):
                 self.total_supply,
                 self.all_tokens,
                 self.is_operator,
-                self.token_metadata,
-                self.token_owner],
+                self.token_metadata],
             "permissions": {
                 "operator": "owner-or-operator-transfer",
                 "receiver": "owner-no-hook",
@@ -129,33 +139,37 @@ class HarbergerToken(sp.Contract):
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
             creator=sp.TAddress,
+            amount=sp.TNat,
             metadata=sp.TMap(sp.TString, sp.TBytes),
-            price=sp.TMutez,
-            fee=sp.TNat).layout(
-                ("creator", ("metadata", ("price", "fee")))))
+            fee=sp.TMutez,
+            interval=sp.TNat,
+            end_date=sp.TOption(sp.TTimestamp)).layout(
+                ("creator", ("amount", ("metadata", ("fee", ("interval", "end_date")))))))
 
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Update the ledger and token metadata big maps
+        # Update the big maps
         token_id = sp.compute(self.data.counter)
-        self.data.ledger[token_id] = params.creator
+        self.data.ledger[(params.creator, token_id)] = params.amount
+        self.data.supply[token_id] = params.amount
         self.data.token_metadata[token_id] = sp.record(
             token_id=token_id,
             token_info=params.metadata)
 
         # Send the fee information to the fees contract
         add_fee_handle = sp.contract(
-            t=HarbergerToken.TOKEN_FEE_TYPE,
+            t=SubscriptionToken.TOKEN_FEE_TYPE,
             address=self.data.fees_contract.open_some(
                 message="FA2_UNDEFINED_FEES_CONTRACT"),
             entry_point="add_fee").open_some()
         sp.transfer(
             arg=sp.record(
-                price=params.price,
                 fee=params.fee,
+                interval=params.interval,
                 recipient=params.creator,
                 next_payment=sp.now,
+                end_date=params.end_date,
                 auction=False),
             amount=sp.mutez(0),
             destination=add_fee_handle)
@@ -200,12 +214,16 @@ class HarbergerToken(sp.Contract):
 
                 # Check that the transfer amount is not zero
                 with sp.if_(tx.amount > 0):
-                    # Check that the owner really owns the token
-                    sp.verify(self.data.ledger[token_id] == owner,
-                              message="FA2_INSUFFICIENT_BALANCE")
+                    # Remove the token amount from the owner
+                    owner_key = sp.pair(owner, token_id)
+                    self.data.ledger[owner_key] = sp.as_nat(
+                        self.data.ledger.get(owner_key, 0) - tx.amount,
+                        "FA2_INSUFFICIENT_BALANCE")
 
-                    # Set the new token owner
-                    self.data.ledger[token_id] = tx.to_
+                    # Add the token amount to the new owner
+                    new_owner_key = sp.pair(tx.to_, token_id)
+                    self.data.ledger[new_owner_key] = self.data.ledger.get(
+                        new_owner_key, 0) + tx.amount
 
     @sp.entry_point
     def balance_of(self, params):
@@ -228,10 +246,10 @@ class HarbergerToken(sp.Contract):
             self.check_token_exists(request.token_id)
 
             # Return the owner token balance
-            with sp.if_(self.data.ledger[request.token_id] == request.owner):
-                sp.result(sp.record(request=request, balance=1))
-            with sp.else_():
-                sp.result(sp.record(request=request, balance=0))
+            sp.result(sp.record(
+                request=request,
+                balance=self.data.ledger.get(
+                    (request.owner, request.token_id), 0)))
 
         sp.transfer(
             params.requests.map(process_request), sp.mutez(0), params.callback)
@@ -243,8 +261,8 @@ class HarbergerToken(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TList(sp.TVariant(
-            add_operator=HarbergerToken.OPERATOR_KEY_TYPE,
-            remove_operator=HarbergerToken.OPERATOR_KEY_TYPE)))
+            add_operator=SubscriptionToken.OPERATOR_KEY_TYPE,
+            remove_operator=SubscriptionToken.OPERATOR_KEY_TYPE)))
 
         # Loop over the list of update operators
         with sp.for_("update_operator", params) as update_operator:
@@ -368,10 +386,7 @@ class HarbergerToken(sp.Contract):
         self.check_token_exists(params.token_id)
 
         # Return the owner token balance
-        with sp.if_(self.data.ledger[params.token_id] == params.owner):
-            sp.result(sp.nat(1))
-        with sp.else_():
-            sp.result(sp.nat(0))
+        sp.result(self.data.ledger.get((params.owner, params.token_id), 0))
 
     @sp.onchain_view(pure=True)
     def total_supply(self, token_id):
@@ -385,7 +400,7 @@ class HarbergerToken(sp.Contract):
         self.check_token_exists(token_id)
 
         # Return the token total supply
-        sp.result(sp.nat(1))
+        sp.result(self.data.supply.get(token_id, 0))
 
     @sp.onchain_view(pure=True)
     def all_tokens(self):
@@ -400,7 +415,7 @@ class HarbergerToken(sp.Contract):
 
         """
         # Define the input parameter data type
-        sp.set_type(params, HarbergerToken.OPERATOR_KEY_TYPE)
+        sp.set_type(params, SubscriptionToken.OPERATOR_KEY_TYPE)
 
         # Check that the token exists
         self.check_token_exists(params.token_id)
@@ -422,21 +437,7 @@ class HarbergerToken(sp.Contract):
         # Return the token metadata
         sp.result(self.data.token_metadata[token_id])
 
-    @sp.onchain_view(pure=True)
-    def token_owner(self, token_id):
-        """Returns the token owner.
 
-        """
-        # Define the input parameter data type
-        sp.set_type(token_id, sp.TNat)
-
-        # Check that the token exists
-        self.check_token_exists(token_id)
-
-        # Return the token owner
-        sp.result(self.data.ledger[token_id])
-
-
-sp.add_compilation_target("harbergerToken", HarbergerToken(
+sp.add_compilation_target("subscriptionToken", SubscriptionToken(
     administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
-    metadata=sp.utils.metadata_of_url("ipfs://bbb")))
+    metadata=sp.utils.metadata_of_url("ipfs://aaa")))

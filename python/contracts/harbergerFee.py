@@ -3,22 +3,22 @@ import smartpy as sp
 
 class HarbergerFee(sp.Contract):
     """This contract calculates and distributes the Harberger fees associated
-    to an specific token contract.
+    to a specific token contract.
 
     """
 
-    TOKEN_FEE_VALUE_TYPE = sp.TRecord(
+    TOKEN_FEE_TYPE = sp.TRecord(
         # The price set by the token owner
         price=sp.TMutez,
         # The Harberger fee in per mile
         fee=sp.TNat,
         # The Harberger fee recipient
-        fee_recipient=sp.TAddress,
+        recipient=sp.TAddress,
         # The deadline for the next fee payment
         next_payment=sp.TTimestamp,
         # Flag that indicates if the token is currently on a Dutch auction
         auction=sp.TBool).layout(
-            ("price", ("fee", ("fee_recipient", ("next_payment", "auction")))))
+            ("price", ("fee", ("recipient", ("next_payment", "auction")))))
 
     # Fees are paid every 30 days
     FEE_PERIOD_IN_SECONDS = 3600 * 24 * 30
@@ -38,7 +38,7 @@ class HarbergerFee(sp.Contract):
             # The big map with the token owners deposits to pay the fees
             deposits=sp.TBigMap(sp.TAddress, sp.TMutez),
             # The big map with the tokens fee information
-            fees=sp.TBigMap(sp.TNat, HarbergerFee.TOKEN_FEE_VALUE_TYPE),
+            fees=sp.TBigMap(sp.TNat, HarbergerFee.TOKEN_FEE_TYPE),
             # The big map with the tokens fee payment approvals
             approved_tokens=sp.TBigMap(
                 sp.TPair(sp.TAddress, sp.TNat), sp.TUnit),
@@ -59,7 +59,7 @@ class HarbergerFee(sp.Contract):
         """Checks that no tez were transferred in the operation.
 
         """
-        sp.verify(sp.amount == sp.tez(0), message="HFEE_TEZ_TRANSFER")
+        sp.verify(sp.amount == sp.mutez(0), message="HFEE_TEZ_TRANSFER")
 
     def get_deposit(self, user):
         """Gets amount of mutez in the user deposit.
@@ -98,7 +98,7 @@ class HarbergerFee(sp.Contract):
                   message="HFEE_TOKEN_NOT_APPROVED")
 
     def get_token_owner(self, token_id):
-        """Gets the token owner from the FA2 contract on-chain view.
+        """Gets the token owner from the token contract on-chain view.
 
         """
         return sp.view(
@@ -180,7 +180,7 @@ class HarbergerFee(sp.Contract):
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
             token_id=sp.TNat,
-            fee_information=HarbergerFee.TOKEN_FEE_VALUE_TYPE).layout(
+            fee_information=HarbergerFee.TOKEN_FEE_TYPE).layout(
                 ("token_id", "fee_information")))
 
         # Check that the token contract executed the entry point
@@ -238,16 +238,17 @@ class HarbergerFee(sp.Contract):
         sp.verify(~fee_information.auction, message="HFEE_TOKEN_ON_AUCTION")
 
         # Check that the sender is the token owner
-        token_owner = self.get_token_owner(params.token_id)
-        sp.verify(sp.sender == token_owner, message="HFEE_SENDER_IS_NOT_OWNER")
+        sp.verify(sp.sender == self.get_token_owner(params.token_id),
+                  message="HFEE_SENDER_IS_NOT_OWNER")
 
-        # Charge the fee if the owner is not the fee recipient
-        with sp.if_(sp.sender != fee_information.fee_recipient):
+        # Charge the fee if the owner is not the fee recipient, since the fee
+        # recipient never pays fees
+        with sp.if_(sp.sender != fee_information.recipient):
             # Check that the owner approved to pay the token fees
             self.check_token_is_approved(sp.sender, params.token_id)
 
             # Calculate the fee amount to pay for the new price
-            fee = sp.local("fee",
+            fee_amount = sp.local("fee_amount",
                 sp.split_tokens(params.price, fee_information.fee, 1000))
 
             # Calculate the remaining fee amount from the old price
@@ -257,35 +258,36 @@ class HarbergerFee(sp.Contract):
                 montly_payment, abs(sp.now - fee_information.next_payment),
                 HarbergerFee.FEE_PERIOD_IN_SECONDS))
 
-            # Combine the two fees
+            # Combine the two fee amounts
             with sp.if_(sp.now < fee_information.next_payment):
-                with sp.if_(fee.value > remaining_fee):
-                    fee.value -= remaining_fee
+                # Subtract the fee amount that was paid in advance
+                with sp.if_(fee_amount.value > remaining_fee):
+                    fee_amount.value -= remaining_fee
                 with sp.else_():
-                    fee.value = sp.mutez(0)
+                    fee_amount.value = sp.mutez(0)
             with sp.else_():
-                # Add the two fees together
-                fee.value += remaining_fee
+                # Add the two fee amounts together
+                fee_amount.value += remaining_fee
 
             # Check if there is some fee to pay
-            with sp.if_(fee.value > sp.mutez(0)):
+            with sp.if_(fee_amount.value > sp.mutez(0)):
                 # Check that the owner has enough tez in their deposit to pay
                 # the fee
                 deposit = sp.compute(self.get_deposit(sp.sender))
-                sp.verify(deposit >= fee.value,
+                sp.verify(deposit >= fee_amount.value,
                           message="HFEE_INSUFFICIENT_TEZ_BALANCE")
 
-                # Subtract the fee from the owner deposit
-                self.data.deposits[sp.sender] = deposit - fee.value
+                # Subtract the fee amount from the owner deposit
+                self.data.deposits[sp.sender] = deposit - fee_amount.value
 
                 # Send the fee to the fee recipient
-                sp.send(fee_information.fee_recipient, fee.value)
+                sp.send(fee_information.recipient, fee_amount.value)
 
         # Update the fee information
         self.data.fees[params.token_id] = sp.record(
             price=params.price,
             fee=fee_information.fee,
-            fee_recipient=fee_information.fee_recipient,
+            recipient=fee_information.recipient,
             next_payment=sp.now.add_seconds(HarbergerFee.FEE_PERIOD_IN_SECONDS),
             auction=False)
 
@@ -295,6 +297,9 @@ class HarbergerFee(sp.Contract):
 
         Any user can pay the fees of a given token. They don't need to be the
         token owner.
+
+        This is necessary when the token is transferred to a contract that
+        might not have a way to pay the fees.
 
         """
         # Define the input parameter data type
@@ -316,27 +321,28 @@ class HarbergerFee(sp.Contract):
         # Check that the fee recipient is not the current token owner, since
         # the fee recipient never pays fees
         token_owner = self.get_token_owner(params.token_id)
-        sp.verify(fee_information.fee_recipient != token_owner,
+        sp.verify(fee_information.recipient != token_owner,
                   message="HFEE_OWNER_IS_FEE_RECIPIENT")
 
         # Check that the sender approved to pay the token fees
         self.check_token_is_approved(sp.sender, params.token_id)
 
         # Calculate the amount of fees to pay
-        fee = sp.compute(sp.mul(params.months, sp.split_tokens(
+        fee_amount = sp.compute(sp.mul(params.months, sp.split_tokens(
             fee_information.price, fee_information.fee, 1000)))
 
         # Check if there is some fee to pay
-        with sp.if_(fee > sp.mutez(0)):
+        with sp.if_(fee_amount > sp.mutez(0)):
             # Check that the sender has enough tez in their deposit to pay
             deposit = sp.compute(self.get_deposit(sp.sender))
-            sp.verify(deposit >= fee, message="HFEE_INSUFFICIENT_TEZ_BALANCE")
+            sp.verify(deposit >= fee_amount,
+                      message="HFEE_INSUFFICIENT_TEZ_BALANCE")
 
-            # Subtract the fee from the sender deposit
-            self.data.deposits[sp.sender] = deposit - fee
+            # Subtract the fee amount from the sender deposit
+            self.data.deposits[sp.sender] = deposit - fee_amount
 
-            # Send the fee to the fee recipient
-            sp.send(fee_information.fee_recipient, fee)
+            # Send the fee amount to the fee recipient
+            sp.send(fee_information.recipient, fee_amount)
 
         # Update the deadline for the next payment
         self.data.fees[params.token_id].next_payment = fee_information.next_payment.add_seconds(
@@ -349,7 +355,7 @@ class HarbergerFee(sp.Contract):
         Anyone can call this entrypoint.
 
         If the owner does not have enough tez in their deposit to pay the fees,
-        the token price is set to zero, and could be collected by anyone.
+        the token is put on sale using a Dutch auction.
 
         """
         # Define the input parameter data type
@@ -368,7 +374,7 @@ class HarbergerFee(sp.Contract):
         # Check that the fee recipient is not the current token owner, since
         # the fee recipient never pays fees
         token_owner = sp.compute(self.get_token_owner(token_id))
-        sp.verify(fee_information.fee_recipient != token_owner,
+        sp.verify(fee_information.recipient != token_owner,
                   message="HFEE_OWNER_IS_FEE_RECIPIENT")
 
         # Check if the deadline to pay the fees has expired
@@ -378,22 +384,22 @@ class HarbergerFee(sp.Contract):
                 fee_information.price, fee_information.fee, 1000)
             months_to_pay = sp.compute(1 + (
                 sp.as_nat(sp.now - fee_information.next_payment) // HarbergerFee.FEE_PERIOD_IN_SECONDS))
-            fee = sp.compute(sp.mul(months_to_pay, montly_payment))
+            fee_amount = sp.compute(sp.mul(months_to_pay, montly_payment))
 
             # Check if there is some fee to pay
-            with sp.if_(fee > sp.mutez(0)):
+            with sp.if_(fee_amount > sp.mutez(0)):
                 # Check if owner has enough tez in their deposit to pay the fee
-                # and has accepted to pay them for that token
+                # and has accepted to pay the fees for that token
                 deposit = sp.compute(self.get_deposit(token_owner))
                 approved = self.data.approved_tokens.contains(
                     (token_owner, token_id))
 
-                with sp.if_((deposit >= fee) & approved):
-                    # Subtract the fee from the owners deposit
-                    self.data.deposits[token_owner] = deposit - fee
+                with sp.if_((deposit >= fee_amount) & approved):
+                    # Subtract the fee amount from the owners deposit
+                    self.data.deposits[token_owner] = deposit - fee_amount
 
-                    # Send the fee to the fee recipient
-                    sp.send(fee_information.fee_recipient, fee)
+                    # Send the fee amount to the fee recipient
+                    sp.send(fee_information.recipient, fee_amount)
 
                     # Update the deadline for the next payment
                     self.data.fees[token_id].next_payment = fee_information.next_payment.add_seconds(
@@ -402,7 +408,7 @@ class HarbergerFee(sp.Contract):
                     with sp.if_((deposit > sp.mutez(0)) & approved):
                         # Send whatever is available in the owner deposit to the
                         # fee recipient
-                        sp.send(fee_information.fee_recipient, deposit)
+                        sp.send(fee_information.recipient, deposit)
 
                         # Set the token owner deposit to zero
                         self.data.deposits[token_owner] = sp.mutez(0)
@@ -411,7 +417,7 @@ class HarbergerFee(sp.Contract):
                     self.data.fees[token_id] = sp.record(
                         price=fee_information.price,
                         fee=fee_information.fee,
-                        fee_recipient=fee_information.fee_recipient,
+                        recipient=fee_information.recipient,
                         next_payment=sp.now,
                         auction=True)
 
@@ -459,29 +465,30 @@ class HarbergerFee(sp.Contract):
             with sp.if_(approved):
                 sp.send(token_owner, sp.amount)
             with sp.else_():
-                sp.send(fee_information.fee_recipient, sp.amount)
+                sp.send(fee_information.recipient, sp.amount)
 
         # Calculate the fee amount to pay for the new price
-        fee = sp.compute(
+        fee_amount = sp.compute(
             sp.split_tokens(params.price, fee_information.fee, 1000))
 
         # Check if there is some fee to pay
-        with sp.if_(fee > sp.mutez(0)):
+        with sp.if_(fee_amount > sp.mutez(0)):
             # Check that the sender has enough tez in their deposit to pay
             deposit = sp.compute(self.get_deposit(sp.sender))
-            sp.verify(deposit >= fee, message="HFEE_INSUFFICIENT_TEZ_BALANCE")
+            sp.verify(deposit >= fee_amount,
+                      message="HFEE_INSUFFICIENT_TEZ_BALANCE")
 
-            # Subtract the fee from the sender deposit
-            self.data.deposits[sp.sender] = deposit - fee
+            # Subtract the fee amount from the sender deposit
+            self.data.deposits[sp.sender] = deposit - fee_amount
 
-            # Send the fee to the fee recipient
-            sp.send(fee_information.fee_recipient, fee)
+            # Send the fee amount to the fee recipient
+            sp.send(fee_information.recipient, fee_amount)
 
         # Update the fee information
         self.data.fees[params.token_id] = sp.record(
             price=params.price,
             fee=fee_information.fee,
-            fee_recipient=fee_information.fee_recipient,
+            recipient=fee_information.recipient,
             next_payment=sp.now.add_seconds(HarbergerFee.FEE_PERIOD_IN_SECONDS),
             auction=False)
 
@@ -532,7 +539,7 @@ class HarbergerFee(sp.Contract):
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            message="FA2_NO_NEW_ADMIN"), message="FA2_NOT_PROPOSED_ADMIN")
+            message="HFEE_NO_NEW_ADMIN"), message="HFEE_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender
