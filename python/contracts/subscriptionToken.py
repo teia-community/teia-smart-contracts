@@ -29,17 +29,6 @@ class SubscriptionToken(sp.Contract):
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
 
-    COLLECTION_FEE_TYPE = sp.TRecord(
-        # The fee in mutez
-        fee=sp.TMutez,
-        # The fee payment interval in days
-        interval=sp.TNat,
-        # The fee recipient
-        recipient=sp.TAddress,
-        # The date when the fee doesn't need to be paid anymore
-        end_date=sp.TOption(sp.TTimestamp)).layout(
-            ("fee", ("interval", ("recipient", "end_date"))))
-
     def __init__(self, administrator, metadata):
         """Initializes the contract.
 
@@ -61,8 +50,6 @@ class SubscriptionToken(sp.Contract):
             token_collection=sp.TBigMap(sp.TNat, sp.TNat),
             # The big map with the tokens operators
             operators=sp.TBigMap(SubscriptionToken.OPERATOR_KEY_TYPE, sp.TUnit),
-            # The proposed new administrator address
-            proposed_administrator=sp.TOption(sp.TAddress),
             # A counter that tracks the total number of tokens minted so far
             counter=sp.TNat))
 
@@ -75,7 +62,6 @@ class SubscriptionToken(sp.Contract):
             token_metadata=sp.big_map(),
             token_collection=sp.big_map(),
             operators=sp.big_map(),
-            proposed_administrator=sp.none,
             counter=0)
 
         # Build the TZIP-016 contract metadata
@@ -151,8 +137,7 @@ class SubscriptionToken(sp.Contract):
             t=sp.TRecord(
                 token_id=sp.TNat,
                 collection_id=sp.TNat).layout(("token_id", "collection_id")),
-            address=self.data.fees_contract.open_some(
-                message="FA2_UNDEFINED_FEES_CONTRACT"),
+            address=self.data.fees_contract.open_some(),
             entry_point="add_token").open_some()
         sp.transfer(
             arg=sp.record(
@@ -188,8 +173,7 @@ class SubscriptionToken(sp.Contract):
 
                 # Check that the sender is one of the token operators
                 owner = sp.compute(transfer.from_)
-                fees_contract = self.data.fees_contract.open_some(
-                    message="FA2_UNDEFINED_FEES_CONTRACT")
+                fees_contract = self.data.fees_contract.open_some()
                 sp.verify(
                     (sp.sender == owner) | 
                     (sp.sender == fees_contract) | 
@@ -270,52 +254,6 @@ class SubscriptionToken(sp.Contract):
 
                     # Remove the operator from the operators big map
                     del self.data.operators[operator_key]
-
-    @sp.entry_point
-    def transfer_administrator(self, proposed_administrator):
-        """Proposes to transfer the contract administrator to another address.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(proposed_administrator, sp.TAddress)
-
-        # Check that the administrator executed the entry point
-        self.check_is_administrator()
-
-        # Set the new proposed administrator address
-        self.data.proposed_administrator = sp.some(proposed_administrator)
-
-    @sp.entry_point
-    def accept_administrator(self):
-        """The proposed administrator accepts the contract administrator
-        responsibilities.
-
-        """
-        # Check that the proposed administrator executed the entry point
-        sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            message="FA2_NO_NEW_ADMIN"), message="FA2_NOT_PROPOSED_ADMIN")
-
-        # Set the new administrator address
-        self.data.administrator = sp.sender
-
-        # Reset the proposed administrator value
-        self.data.proposed_administrator = sp.none
-
-    @sp.entry_point
-    def set_metadata(self, params):
-        """Updates the contract metadata.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
-            k=sp.TString,
-            v=sp.TBytes).layout(("k", "v")))
-
-        # Check that the administrator executed the entry point
-        self.check_is_administrator()
-
-        # Update the contract metadata
-        self.data.metadata[params.k] = params.v
 
     @sp.entry_point
     def set_fees_contract(self, fees_contract):

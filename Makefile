@@ -74,6 +74,7 @@ compile_all:
 	$(call COMPILE, representatives)
 	$(call COMPILE, harbergerToken)
 	$(call COMPILE, harbergerFee)
+	$(call COMPILE, subscriptionCollections)
 	$(call COMPILE, subscriptionToken)
 	$(call COMPILE, subscriptionFee)
 

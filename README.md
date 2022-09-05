@@ -44,6 +44,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py ../output/contracts/harbergerToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py ../output/contracts/harbergerFee --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/subscriptionCollections.py ../output/contracts/subscriptionCollections --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionToken.py ../output/contracts/subscriptionToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionFee.py ../output/contracts/subscriptionFee --html --purge
 ```

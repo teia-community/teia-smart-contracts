@@ -13,6 +13,7 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py /tmp/contracts/representatives
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py /tmp/contracts/harbergerToken
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py /tmp/contracts/harbergerFee
+~/smartpy-cli/SmartPy.sh compile contracts/subscriptionCollections.py /tmp/contracts/subscriptionCollections
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionToken.py /tmp/contracts/subscriptionToken
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionFee.py /tmp/contracts/subscriptionFee
 cd - > /dev/null
