@@ -15,6 +15,7 @@
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
+| [Subscription collections](python/contracts/subscriptionCollections.py) | | Prototype |
 | [Subscription token](python/contracts/subscriptionToken.py) | | Prototype |
 | [Subscription fee](python/contracts/subscriptionFee.py) | | Prototype |
 
