@@ -74,9 +74,9 @@ compile_all:
 	$(call COMPILE, representatives)
 	$(call COMPILE, harbergerToken)
 	$(call COMPILE, harbergerFee)
-	$(call COMPILE, subscriptionCollections)
 	$(call COMPILE, subscriptionToken)
 	$(call COMPILE, subscriptionFee)
+	$(call COMPILE, subscriptionsMarketplace)
 
 test_all:
 	$(call TEST, teiaMarketplace_v1)
