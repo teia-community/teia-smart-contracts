@@ -118,7 +118,7 @@ class SubscriptionsMarketplace(sp.Contract):
         # Check that no tez have been transferred
         self.check_no_tez_transfer()
 
-        # Update the collections and the minted tokens big map
+        # Update the big maps
         collection_id = sp.compute(self.data.counter)
         self.data.collections[collection_id] = sp.record(
             creator=sp.sender,
@@ -152,6 +152,12 @@ class SubscriptionsMarketplace(sp.Contract):
         """Sets the maximum number of tokens that can be minted in the
         collection.
 
+        The maximum number of tokens can only be decreased, not increased. That
+        protects collectors of the tokens, making sure that the supply cannot
+        be arbitrarily increased by the collection creator.
+
+        Setting max tokens to 0 is like burning the collection.
+
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
@@ -175,14 +181,14 @@ class SubscriptionsMarketplace(sp.Contract):
         sp.verify(self.data.minted_tokens[collection_id] <= new_max_tokens,
                   message="SM_TOO_MANY_MINTED_TOKENS")
 
-        # Check that the new max_tokens value is smaller than the previous
+        # Check that the new max_tokens value is smaller than the previous one
         sp.verify(~collection.max_tokens.is_some() | 
                   (collection.max_tokens.open_some() > new_max_tokens),
-                  message="SM_WRONG_MAX_NUMBER")
+                  message="SM_WRONG_MAX_TOKENS")
 
-        # Check if the user wants to delete the collection
+        # Check if the user wants to burn the collection
         with sp.if_(new_max_tokens == 0):
-            # Delete the collection
+            # Burn the collection
             del self.data.collections[collection_id]
             del self.data.mint_open[collection_id]
             del self.data.minted_tokens[collection_id]
@@ -231,10 +237,9 @@ class SubscriptionsMarketplace(sp.Contract):
         # Check that it is still possible to mint tokens for this collection
         collection = sp.compute(self.data.collections[collection_id])
         minted_tokens = sp.compute(self.data.minted_tokens[collection_id])
-
-        with sp.if_(collection.max_tokens.is_some()):
-            sp.verify(collection.max_tokens.open_some() > minted_tokens,
-                      message="SM_ALL_TOKENS_MINTED")
+        sp.verify(~collection.max_tokens.is_some() | 
+                  (collection.max_tokens.open_some() > minted_tokens),
+                  message="SM_ALL_TOKENS_MINTED")
 
         # Check that the sent amount coincides with the mint price
         sp.verify(sp.amount == collection.mint_price,
@@ -292,8 +297,24 @@ class SubscriptionsMarketplace(sp.Contract):
         self.data.fee = new_fee
 
     @sp.entry_point
+    def update_fee_recipient(self, new_fee_recipient):
+        """Updates the marketplace fee recipient.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_fee_recipient, sp.TAddress)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Set the new marketplace fee recipient
+        self.data.fee_recipient = new_fee_recipient
+
+    @sp.entry_point
     def set_token_contract(self, token_contract):
         """Sets the token contract.
+
+        For security reasons, the token contract can only be set once.
 
         """
         # Define the input parameter data type

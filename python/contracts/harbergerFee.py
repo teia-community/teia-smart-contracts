@@ -346,7 +346,7 @@ class HarbergerFee(sp.Contract):
 
         # Update the deadline for the next payment
         self.data.fees[params.token_id].next_payment = fee_information.next_payment.add_seconds(
-            sp.mul(params.months, HarbergerFee.FEE_PERIOD_IN_SECONDS))
+            sp.to_int(params.months * HarbergerFee.FEE_PERIOD_IN_SECONDS))
 
     @sp.entry_point
     def apply_fees(self, token_id):
@@ -403,7 +403,7 @@ class HarbergerFee(sp.Contract):
 
                     # Update the deadline for the next payment
                     self.data.fees[token_id].next_payment = fee_information.next_payment.add_seconds(
-                        sp.mul(months_to_pay, HarbergerFee.FEE_PERIOD_IN_SECONDS))
+                        sp.to_int(months_to_pay * HarbergerFee.FEE_PERIOD_IN_SECONDS))
                 with sp.else_():
                     with sp.if_((deposit > sp.mutez(0)) & approved):
                         # Send whatever is available in the owner deposit to the

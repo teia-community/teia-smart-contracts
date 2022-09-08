@@ -29,14 +29,14 @@ class SubscriptionToken(sp.Contract):
         token_id=sp.TNat).layout(
             ("owner", ("operator", "token_id")))
 
-    def __init__(self, administrator, metadata):
+    def __init__(self, minter_contract, metadata):
         """Initializes the contract.
 
         """
         # Define the contract storage data types for clarity
         self.init_type(sp.TRecord(
-            # The contract administrator
-            administrator=sp.TAddress,
+            # The minter contract address
+            minter_contract=sp.TAddress,
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
             # The fees contract address
@@ -55,7 +55,7 @@ class SubscriptionToken(sp.Contract):
 
         # Initialize the contract storage
         self.init(
-            administrator=administrator,
+            minter_contract=minter_contract,
             metadata=metadata,
             fees_contract=sp.none,
             ledger=sp.big_map(),
@@ -75,7 +75,7 @@ class SubscriptionToken(sp.Contract):
             "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
             "homepage": "https://teia.art",
             "source": {
-                "tools": ["SmartPy 0.9.1"],
+                "tools": ["SmartPy 0.13.0"],
                 "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/subscriptionToken.py"
             },
             "interfaces": ["TZIP-012", "TZIP-016"],
@@ -96,12 +96,19 @@ class SubscriptionToken(sp.Contract):
 
         self.init_metadata("contract_metadata", contract_metadata)
 
-    def check_is_administrator(self):
-        """Checks that the address that called the entry point is the contract
-        administrator.
+    def check_no_tez_transfer(self):
+        """Checks that no tez were transferred in the operation.
 
         """
-        sp.verify(sp.sender == self.data.administrator, message="FA2_NOT_ADMIN")
+        sp.verify(sp.amount == sp.mutez(0), message="FA2_TEZ_TRANSFER")
+
+    def check_is_minter_contract(self):
+        """Checks that the address that called the entry point is the minter
+        contract.
+
+        """
+        sp.verify(sp.sender == self.data.minter_contract,
+                  message="FA2_NOT_MINTER_CONTRACT")
 
     def check_token_exists(self, token_id):
         """Checks that the given token exists.
@@ -121,8 +128,8 @@ class SubscriptionToken(sp.Contract):
             collection_id=sp.TNat).layout(
                 ("minter", ("metadata", "collection_id"))))
 
-        # Check that the administrator executed the entry point
-        self.check_is_administrator()
+        # Check that the minter contract executed the entry point
+        self.check_is_minter_contract()
 
         # Update the ledger, token metadata and collections big maps
         token_id = sp.compute(self.data.counter)
@@ -164,6 +171,9 @@ class SubscriptionToken(sp.Contract):
                     ("to_", ("token_id", "amount"))))).layout(
                         ("from_", "txs"))))
 
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
+
         # Loop over the list of transfers
         with sp.for_("transfer", params) as transfer:
             with sp.for_("tx", transfer.txs) as tx:
@@ -186,7 +196,8 @@ class SubscriptionToken(sp.Contract):
                 # Check that the transfer amount is not zero
                 with sp.if_(tx.amount > 0):
                     # Check that the owner really owns the token
-                    sp.verify(self.data.ledger[token_id] == owner,
+                    sp.verify((tx.amount == 1) & 
+                              (self.data.ledger[token_id] == owner),
                               message="FA2_INSUFFICIENT_BALANCE")
 
                     # Set the new token owner
@@ -213,10 +224,12 @@ class SubscriptionToken(sp.Contract):
             self.check_token_exists(request.token_id)
 
             # Return the owner token balance
+            balance = sp.local("balance", sp.nat(0))
+
             with sp.if_(self.data.ledger[request.token_id] == request.owner):
-                sp.result(sp.record(request=request, balance=1))
-            with sp.else_():
-                sp.result(sp.record(request=request, balance=0))
+                balance.value = sp.nat(1)
+
+            sp.result(sp.record(request=request, balance=balance.value))
 
         sp.transfer(
             params.requests.map(process_request), sp.mutez(0), params.callback)
@@ -230,6 +243,9 @@ class SubscriptionToken(sp.Contract):
         sp.set_type(params, sp.TList(sp.TVariant(
             add_operator=SubscriptionToken.OPERATOR_KEY_TYPE,
             remove_operator=SubscriptionToken.OPERATOR_KEY_TYPE)))
+
+        # Check that no tez have been transferred
+        self.check_no_tez_transfer()
 
         # Loop over the list of update operators
         with sp.for_("update_operator", params) as update_operator:
@@ -259,18 +275,12 @@ class SubscriptionToken(sp.Contract):
     def set_fees_contract(self, fees_contract):
         """Sets the contract that will administer the token fees.
 
-        For security reasons, the fees contract can only be set once.
-
         """
         # Define the input parameter data type
         sp.set_type(fees_contract, sp.TAddress)
 
-        # Check that the administrator executed the entry point
-        self.check_is_administrator()
-
-        # Check that fees contract has not been set before
-        sp.verify(~self.data.fees_contract.is_some(),
-                  message="FA2_FEES_CONTRACT_IS_ALREADY_SET")
+        # Check that the minter contract executed the entry point
+        self.check_is_minter_contract()
 
         # Set the fees contract address
         self.data.fees_contract = sp.some(fees_contract)
@@ -307,10 +317,12 @@ class SubscriptionToken(sp.Contract):
         self.check_token_exists(params.token_id)
 
         # Return the owner token balance
+        balance = sp.local("balance", sp.nat(0))
+
         with sp.if_(self.data.ledger[params.token_id] == params.owner):
-            sp.result(sp.nat(1))
-        with sp.else_():
-            sp.result(sp.nat(0))
+            balance.value = sp.nat(1)
+
+        sp.result(balance.value)
 
     @sp.onchain_view(pure=True)
     def total_supply(self, token_id):
@@ -362,20 +374,6 @@ class SubscriptionToken(sp.Contract):
         sp.result(self.data.token_metadata[token_id])
 
     @sp.onchain_view(pure=True)
-    def token_collection(self, token_id):
-        """Returns the token collection id.
-
-        """
-        # Define the input parameter data type
-        sp.set_type(token_id, sp.TNat)
-
-        # Check that the token exists
-        self.check_token_exists(token_id)
-
-        # Return the token collection id
-        sp.result(self.data.token_collection[token_id])
-
-    @sp.onchain_view(pure=True)
     def token_owner(self, token_id):
         """Returns the token owner.
 
@@ -389,7 +387,21 @@ class SubscriptionToken(sp.Contract):
         # Return the token owner
         sp.result(self.data.ledger[token_id])
 
+    @sp.onchain_view(pure=True)
+    def token_collection(self, token_id):
+        """Returns the token collection id.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_id, sp.TNat)
+
+        # Check that the token exists
+        self.check_token_exists(token_id)
+
+        # Return the token collection id
+        sp.result(self.data.token_collection[token_id])
+
 
 sp.add_compilation_target("subscriptionToken", SubscriptionToken(
-    administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
-    metadata=sp.utils.metadata_of_url("ipfs://bbb")))
+    minter_contract=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
+    metadata=sp.utils.metadata_of_url("ipfs://aaa")))

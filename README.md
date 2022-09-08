@@ -15,6 +15,7 @@
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
+| [Harberger token minter](python/contracts/harbergerMinter.py) | | Prototype |
 | [Subscription token](python/contracts/subscriptionToken.py) | | Prototype |
 | [Subscription fee](python/contracts/subscriptionFee.py) | | Prototype |
 | [Subscriptions marketplace](python/contracts/subscriptionsMarketplace.py) | | Prototype |
@@ -45,6 +46,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py ../output/contracts/harbergerToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py ../output/contracts/harbergerFee --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/harbergerMinter.py ../output/contracts/harbergerMinter --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionToken.py ../output/contracts/subscriptionToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionFee.py ../output/contracts/subscriptionFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionsMarketplace.py ../output/contracts/subscriptionsMarketplace --html --purge
