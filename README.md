@@ -50,6 +50,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionToken.py ../output/contracts/subscriptionToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionFee.py ../output/contracts/subscriptionFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionsMarketplace.py ../output/contracts/subscriptionsMarketplace --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/donations.py ../output/contracts/donations --html --purge
 ```
 
 ## Execute the tests
