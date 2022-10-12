@@ -1,0 +1,13 @@
+{
+    "name": "Solidarity for Iranian Artists - Open letter",
+    "description": "This contract is used to sign the open letter written in solidarity with the Irania Artists",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "source": {
+        "tools": ["SmartPy 0.14.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/openLetter.py"
+    }
+}
