@@ -250,7 +250,8 @@ class Donations(sp.Contract):
         """
         # Check that the proposed administrator executed the entry point
         sp.verify(sp.sender == self.data.proposed_administrator.open_some(
-            message="SM_NO_NEW_ADMIN"), message="SM_NOT_PROPOSED_ADMIN")
+            message="DONATIONS_NO_NEW_ADMIN"),
+            message="DONATIONS_NOT_PROPOSED_ADMIN")
 
         # Set the new administrator address
         self.data.administrator = sp.sender
@@ -261,5 +262,5 @@ class Donations(sp.Contract):
 
 sp.add_compilation_target("donations", Donations(
     administrator=sp.address("tz1RssrimWo3B8TpCajiNjqBD3MfhUwEgxod"),
-    metadata=sp.utils.metadata_of_url("ipfs://aaa"),
+    metadata=sp.utils.metadata_of_url("ipfs://bafkreicrnzzdn3v6fgvvtmpjr2op3x6qn2cgitktgxwxp4ezqmj2hqu3ry"),
     oXTZ=sp.address("KT1TjnZYs5CGLbmV6yuW169P8Pnr9BiVwwjz")))
