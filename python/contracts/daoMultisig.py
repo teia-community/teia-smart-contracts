@@ -1,8 +1,12 @@
-"""A multisig / mini-DAO contract.
+"""A multisig / mini-DAO contract for the initial teia DAO phase.
 
 Users of the wallet can add their own proposals and vote proposals added by
 other users. The proposals can be executed when the number of minimum positive
 votes is reached.
+
+For legal DAO-related reasons, users need to accept their membership before
+they are included in the multisig. Users can also leave the multisig at any
+time.
 
 The contract implements the following kinds of proposals:
 
@@ -19,6 +23,7 @@ The contract implements the following kinds of proposals:
 Error message codes:
 
     - MS_NOT_USER: The operation can only be executed by one of the multisig wallet users.
+    - MS_NOT_PROPOSED_USER: The operation can only be executed by one of the multisig wallet proposed users.
     - MS_INEXISTENT_PROPOSAL: The given proposal id doesn't exist.
     - MS_EXECUTED_PROPOSAL: The proposal has been executed and cannot be voted or executed anymore.
     - MS_EXPIRED_PROPOSAL: The proposal has expired and cannot be voted or executed anymore.
@@ -35,8 +40,9 @@ Error message codes:
 import smartpy as sp
 
 
-class MultisigWallet(sp.Contract):
-    """This contract implements a basic multisig wallet / mini-DAO.
+class DaoMultisig(sp.Contract):
+    """This contract implements a basic multisig wallet that will be used in
+    the initial teia DAO phase.
 
     """
 
@@ -124,7 +130,8 @@ class MultisigWallet(sp.Contract):
         # The number of token editions
         amount=sp.TNat).layout(("to_", ("token_id", "amount")))
 
-    def __init__(self, metadata, users, minimum_votes, expiration_time=sp.nat(5)):
+    def __init__(self, metadata, proposed_users, minimum_votes,
+                 expiration_time=sp.nat(5)):
         """Initializes the contract.
 
         Parameters
@@ -148,8 +155,11 @@ class MultisigWallet(sp.Contract):
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
             # The multisig users that can propose, vote and execute proposals.
             users=sp.TSet(sp.TAddress),
+            # The proposed new multisig users that haven't accepted yet their
+            # membership.
+            proposed_users=sp.TSet(sp.TAddress),
             # The big map with the proposals information.
-            proposals=sp.TBigMap(sp.TNat, MultisigWallet.PROPOSAL_TYPE),
+            proposals=sp.TBigMap(sp.TNat, DaoMultisig.PROPOSAL_TYPE),
             # The big map with the votes information.
             votes=sp.TBigMap(sp.TPair(sp.TNat, sp.TAddress), sp.TBool),
             # The minimum number of positive votes required to execute a
@@ -164,7 +174,8 @@ class MultisigWallet(sp.Contract):
         # Initialize the contract storage
         self.init(
             metadata=metadata,
-            users=users,
+            users=sp.set(),
+            proposed_users=proposed_users,
             proposals=sp.big_map(),
             votes=sp.big_map(),
             minimum_votes=minimum_votes,
@@ -177,6 +188,14 @@ class MultisigWallet(sp.Contract):
 
         """
         sp.verify(self.data.users.contains(sp.sender), message="MS_NOT_USER")
+
+    def check_is_proposed_user(self):
+        """Checks that the address that called the entry point is from one of
+        the proposed users.
+
+        """
+        sp.verify(self.data.proposed_users.contains(sp.sender),
+                  message="MS_NOT_PROPOSED_USER")
 
     def check_proposal_is_valid(self, proposal_id):
         """Checks that the proposal_id is from a valid proposal.
@@ -286,7 +305,7 @@ class MultisigWallet(sp.Contract):
 
         """
         # Define the input parameter data type
-        sp.set_type(mutez_transfers, MultisigWallet.MUTEZ_TRANSFERS_TYPE)
+        sp.set_type(mutez_transfers, DaoMultisig.MUTEZ_TRANSFERS_TYPE)
 
         # Check that one of the users executed the entry point
         self.check_is_user()
@@ -305,7 +324,7 @@ class MultisigWallet(sp.Contract):
 
         """
         # Define the input parameter data type
-        sp.set_type(token_transfers, MultisigWallet.TOKEN_TRANSFERS_TYPE)
+        sp.set_type(token_transfers, DaoMultisig.TOKEN_TRANSFERS_TYPE)
 
         # Check that one of the users executed the entry point
         self.check_is_user()
@@ -412,7 +431,7 @@ class MultisigWallet(sp.Contract):
 
         """
         # Define the input parameter data type
-        sp.set_type(lambda_function, MultisigWallet.LAMBDA_FUNCTION_TYPE)
+        sp.set_type(lambda_function, DaoMultisig.LAMBDA_FUNCTION_TYPE)
 
         # Check that one of the users executed the entry point
         self.check_is_user()
@@ -496,7 +515,7 @@ class MultisigWallet(sp.Contract):
                 sp.send(mutez_transfer.destination, mutez_transfer.amount)
 
         with sp.if_(proposal.value.kind.is_variant("transfer_token")):
-            txs = sp.local("txs", sp.list(t=MultisigWallet.FA2_TX_TYPE))
+            txs = sp.local("txs", sp.list(t=DaoMultisig.FA2_TX_TYPE))
             token_transfers = proposal.value.token_transfers.open_some()
 
             with sp.for_("distribution", token_transfers.distribution) as distribution:
@@ -516,7 +535,7 @@ class MultisigWallet(sp.Contract):
             self.data.expiration_time = proposal.value.expiration_time.open_some()
 
         with sp.if_(proposal.value.kind.is_variant("add_user")):
-            self.data.users.add(proposal.value.user.open_some())
+            self.data.proposed_users.add(proposal.value.user.open_some())
 
         with sp.if_(proposal.value.kind.is_variant("remove_user")):
             sp.verify(sp.len(self.data.users.elements()) > 1,
@@ -530,6 +549,52 @@ class MultisigWallet(sp.Contract):
         with sp.if_(proposal.value.kind.is_variant("lambda_function")):
             operations = proposal.value.lambda_function.open_some()(sp.unit)
             sp.add_operations(operations)
+
+    @sp.entry_point
+    def accept_membership(self, acceptance):
+        """Accepts or declines the multisig membership.
+
+        Parameters
+        ----------
+        acceptance: sp.TBool
+            The proposed user membership acceptance (when True) or not 
+            acceptance (when False).
+
+        """
+        # Define the input parameter data type
+        sp.set_type(acceptance, sp.TBool)
+
+        # Check that one of the proposed users executed the entry point
+        self.check_is_proposed_user()
+
+        # Add the user to the multisig if they accept the membership
+        with sp.if_(acceptance):
+            self.data.users.add(sp.sender)
+
+        # Remove the user address from the proposed users
+        self.data.proposed_users.remove(sp.sender)
+
+    @sp.entry_point
+    def leave_multisig(self, unit):
+        """The user leaves the multisig by their own will.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(unit, sp.TUnit)
+
+        # Check that one of the users executed the entry point
+        self.check_is_user()
+
+        # Make sure that it's not the last multisig user
+        sp.verify(sp.len(self.data.users.elements()) > 1,
+                  message="MS_LAST_USER")
+
+        # Remove the user from the multisig
+        self.data.users.remove(sp.sender)
+
+        # Update the minimum votes parameter if necessary
+        with sp.if_(self.data.minimum_votes > sp.len(self.data.users.elements())):
+            self.data.minimum_votes = sp.len(self.data.users.elements())
 
     @sp.onchain_view()
     def get_users(self):
@@ -701,7 +766,7 @@ class MultisigWallet(sp.Contract):
         c = sp.contract(
             t=sp.TList(sp.TRecord(
                 from_=sp.TAddress,
-                txs=sp.TList(MultisigWallet.FA2_TX_TYPE))),
+                txs=sp.TList(DaoMultisig.FA2_TX_TYPE))),
             address=fa2,
             entry_point="transfer").open_some()
 
@@ -713,8 +778,8 @@ class MultisigWallet(sp.Contract):
 
 
 # Add a compilation target initialized to a single user account
-sp.add_compilation_target("multisig", MultisigWallet(
+sp.add_compilation_target("multisig", DaoMultisig(
     metadata=sp.utils.metadata_of_url("ipfs://QmW9G5GXx6CtPUJFK9nKJNxdedehwqPVcqtPq5Tk6XMGEr"),
-    users=sp.set([sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx")]),
+    proposed_users=sp.set([sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx")]),
     minimum_votes=sp.nat(1),
     expiration_time=sp.nat(7)))

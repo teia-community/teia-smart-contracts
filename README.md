@@ -13,12 +13,15 @@
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
+| [DAO multisig](python/contracts/daoMultisig.py) | | Prototype |
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
 | [Harberger token minter](python/contracts/harbergerMinter.py) | | Prototype |
 | [Subscription token](python/contracts/subscriptionToken.py) | | Prototype |
 | [Subscription fee](python/contracts/subscriptionFee.py) | | Prototype |
 | [Subscriptions marketplace](python/contracts/subscriptionsMarketplace.py) | | Prototype |
+| [Contract for donation campaigns](python/contracts/donations.py) | | Prototype |
+| [Contract for signing open letters](python/contracts/openLetter.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -44,6 +47,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoGovernance.py ../output/contracts/daoGovernance --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py ../output/contracts/daoTreasury --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/daoMultisig.py ../output/contracts/daoMultisig --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py ../output/contracts/harbergerToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py ../output/contracts/harbergerFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerMinter.py ../output/contracts/harbergerMinter --html --purge
@@ -51,6 +55,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionFee.py ../output/contracts/subscriptionFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionsMarketplace.py ../output/contracts/subscriptionsMarketplace --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/donations.py ../output/contracts/donations --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/openLetter.py ../output/contracts/openLetter --html --purge
 ```
 
 ## Execute the tests
@@ -67,4 +72,5 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/daoTokenDrop_test.py ../output/tests/daoTokenDrop --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/daoGovernance_test.py ../output/tests/daoGovernance --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/representatives_test.py ../output/tests/representatives --html --purge
+~/smartpy-cli/SmartPy.sh test tests/daoMultisig_test.py ../output/tests/daoMultisig --html --purge
 ```
