@@ -29,7 +29,8 @@ Error message codes:
     - MS_EXPIRED_PROPOSAL: The proposal has expired and cannot be voted or executed anymore.
     - MS_WRONG_MINIMUM_VOTES: The minimum_votes parameter cannot be smaller than 1 or higher than the number of users.
     - MS_WRONG_EXPIRATION_TIME: The expiration_time parameter cannot be smaller than 1 day.
-    - MS_ALREADY_USER: The proposed address is already a multsig user.
+    - MS_ALREADY_PROPOSED_USER: The proposed address is already a multisig proposed user.
+    - MS_ALREADY_USER: The proposed address is already a multisig user.
     - MS_WRONG_USER: The proposed address is not a multisig user.
     - MS_NOT_EXECUTABLE: The proposal didn't receive enough positive votes to be executed.
     - MS_LAST_USER: The last user cannot be removed.
@@ -392,6 +393,10 @@ class DaoMultisig(sp.Contract):
         # Check that one of the users executed the entry point
         self.check_is_user()
 
+        # Check that the new user is not in the proposed users list
+        sp.verify(~self.data.proposed_users.contains(user),
+                  message="MS_ALREADY_PROPOSED_USER")
+
         # Check that the new user is not in the users list
         sp.verify(~self.data.users.contains(user), message="MS_ALREADY_USER")
 
@@ -607,6 +612,27 @@ class DaoMultisig(sp.Contract):
 
         """
         sp.result(self.data.users)
+
+    @sp.onchain_view()
+    def is_proposed_user(self, user):
+        """Checks if the given address is one of the multisig proposed users.
+
+        Parameters
+        ----------
+        user: sp.TAddress
+            The user address.
+
+        Returns
+        -------
+        sp.TBool
+            True, if the address is one of the multisig proposed users.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(user, sp.TAddress)
+
+        # Return true if the user is part of the multisig proposed users
+        sp.result(self.data.proposed_users.contains(user))
 
     @sp.onchain_view()
     def is_user(self, user):

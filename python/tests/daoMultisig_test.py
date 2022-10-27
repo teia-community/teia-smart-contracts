@@ -237,6 +237,7 @@ def test_create_vote_and_execute_proposal():
     # to the proposed users set
     scenario.verify(~multisig.data.users.contains(non_user.address))
     scenario.verify(multisig.data.proposed_users.contains(non_user.address))
+    scenario.verify(multisig.is_proposed_user(non_user.address))
 
     # The user accepts the membership
     multisig.accept_membership(True).run(sender=non_user)
@@ -535,7 +536,11 @@ def test_add_user_proposal():
     scenario.verify(~multisig.data.users.contains(user5.address))
     scenario.verify(~multisig.get_users().contains(user5.address))
     scenario.verify(multisig.data.proposed_users.contains(user5.address))
+    scenario.verify(multisig.is_proposed_user(user5.address))
     scenario.verify(~multisig.is_user(user5.address))
+
+    # Check that it's not possible to propose the same user twice
+    multisig.add_user_proposal(user5.address).run(valid=False, sender=user4)
 
     # The new user accepts the membership
     multisig.accept_membership(True).run(sender=user5)
@@ -545,6 +550,7 @@ def test_add_user_proposal():
     scenario.verify(sp.len(multisig.data.proposed_users.elements()) == 0)
     scenario.verify(sp.len(multisig.get_users().elements()) == 5)
     scenario.verify(multisig.get_users().contains(user5.address))
+    scenario.verify(~multisig.is_proposed_user(user5.address))
     scenario.verify(multisig.is_user(user5.address))
 
 
@@ -654,6 +660,7 @@ def test_accept_membership():
     scenario.verify(sp.len(multisig.data.proposed_users.elements()) == 1)
     scenario.verify(~multisig.data.users.contains(user5.address))
     scenario.verify(multisig.data.proposed_users.contains(user5.address))
+    scenario.verify(multisig.is_proposed_user(user5.address))
     scenario.verify(~multisig.is_user(user5.address))
 
     # Add another add user proposal
@@ -673,6 +680,7 @@ def test_accept_membership():
     scenario.verify(sp.len(multisig.data.proposed_users.elements()) == 2)
     scenario.verify(~multisig.data.users.contains(user6.address))
     scenario.verify(multisig.data.proposed_users.contains(user6.address))
+    scenario.verify(multisig.is_proposed_user(user6.address))
     scenario.verify(~multisig.is_user(user6.address))
 
     # Check that only the proposed users can accept the membership
@@ -688,6 +696,7 @@ def test_accept_membership():
     scenario.verify(multisig.get_users().contains(user5.address))
     scenario.verify(~multisig.get_users().contains(user6.address))
     scenario.verify(multisig.is_user(user5.address))
+    scenario.verify(~multisig.is_user(user6.address))
 
 @sp.add_test(name="Test leave multisig")
 def test_leave_multisig():
