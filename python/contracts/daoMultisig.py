@@ -804,8 +804,27 @@ class DaoMultisig(sp.Contract):
 
 
 # Add a compilation target initialized to a single user account
-sp.add_compilation_target("multisig", DaoMultisig(
-    metadata=sp.utils.metadata_of_url("ipfs://QmW9G5GXx6CtPUJFK9nKJNxdedehwqPVcqtPq5Tk6XMGEr"),
-    proposed_users=sp.set([sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx")]),
-    minimum_votes=sp.nat(1),
-    expiration_time=sp.nat(7)))
+sp.add_compilation_target("daoMultisig", DaoMultisig(
+    metadata=sp.utils.metadata_of_url("ipfs://QmNUgGA8rykZsbXh9N14m9JUvjKHp8hAda45YssxZJtGQf"),
+    proposed_users=sp.set([
+        sp.address("tz1auzguranCBAHCf6s8Nw27gDroPeopXDbJ"),
+        sp.address("tz1STaURypfCdS7FRkK5csHhi8eqdSs8CcPt"),
+        sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"),
+        sp.address("tz1MrSstDn96CnAKvmnfNspVXpqZKX1moKdx"),
+        sp.address("tz1dAW94vB3yYfNPE4LM2txBT8PQ21Zq4Xzf"),
+        sp.address("tz1XtjZTzEM6EQ3TnUPUQviCD6WfcsZRHXbj"),
+        sp.address("tz1U8mFPuyGr48BWnULky9kUqAVQk8ewBHtU"),
+        sp.address("tz28bm6XBaWD5oz171jQE1HjWmMjRz9jDhv7"),
+        sp.address("tz1VzYo5CSoDaNQV731qdN7pkCgnCfajuje1"),
+        sp.address("tz1cALmpTf7EeeSBXHAX2rcnR4WAP8tSWkt6"),
+        sp.address("tz1dd2tmTJFRJh8ycLuZeMpKLquJYkMypu2Q"),
+        sp.address("tz1hhf8mVUb6yCxRaNorzZSibHWXuoKLbXrY"),
+        sp.address("tz1YG4WVDdWhz4Fn7kWfYbsU3W8foipZ1zMz"),
+        sp.address("tz1MDZtKooFzmhcPjgWKMsqiKC7DPDYM2bWq"),
+        sp.address("tz1ZVzMVj6EjRoDNFMCguG7nGdqmD7aau9kS"),
+        sp.address("tz1KseWbS7f7YQhGsGP8QmXDJyzrKV71xxyj"),
+        sp.address("tz1gMRKQWdhY5ZPUehpHofLswyL8Vexvfpbm"),
+        sp.address("tz1RnsQi6BaYpm6sMMTkVqGk5Jk6BKpmTp8C"),
+        sp.address("tz1M7n1FpvfKhByTPhW3pwbQv67Ka5YV17BC")]),
+    minimum_votes=sp.nat(10),
+    expiration_time=sp.nat(10)))
