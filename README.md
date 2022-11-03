@@ -4,6 +4,7 @@
 |----------|-----------|--------|
 | [Teia Marketplace (v1)](python/contracts/teiaMarketplace_v1.py) | [KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w](https://tzkt.io/KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w) | Audited |
 | [Multisig Wallet / mini-DAO (v1)](python/contracts/multisigWallet_v1.py) | [KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P](https://tzkt.io/KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P) | Audited |
+| [Core Team multisig](python/contracts/daoMultisig.py) | [KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb](https://tzkt.io/KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb) | Deployed |
 | [Extended FA2 token](python/contracts/fa2.py) | | Prototype |
 | [Extended FA2 token minter](python/contracts/minter.py) | | Prototype |
 | [Marketplace for the extended FA2 token](python/contracts/marketplace.py) | | Prototype |
@@ -13,7 +14,6 @@
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
-| [DAO multisig](python/contracts/daoMultisig.py) | | Prototype |
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
 | [Harberger token minter](python/contracts/harbergerMinter.py) | | Prototype |
@@ -48,6 +48,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/daoTreasury.py ../output/contracts/daoTreasury --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoMultisig.py ../output/contracts/daoMultisig --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/coreTeamVote.py ../output/contracts/coreTeamVote --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py ../output/contracts/harbergerToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py ../output/contracts/harbergerFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerMinter.py ../output/contracts/harbergerMinter --html --purge

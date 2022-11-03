@@ -1,0 +1,63 @@
+{
+    "name": "Teia Core Team Vote",
+    "description": "Smart contract where the Teia Core Team members can vote multi-option text proposals",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy 0.15.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/coreTeamVote.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "CTV_NOT_CORE_TEAM_USER"}, 
+            "expansion": { "string": "The operation can only be executed by one of the Teia Core Team users"},
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CTV_NOT_MULTISIG"}, 
+            "expansion": { "string": "The operation can only be executed by the Teia Core Team Multisig"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "CTV_INEXISTENT_PROPOSAL"}, 
+            "expansion": { "string": "The given proposal id doesn't exist"},
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CTV_CLOSED_PROPOSAL"}, 
+            "expansion": { "string": "The proposal voting period has passed and it cannot be voted anymore"},
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CTV_WRONG_OPTIONS"}, 
+            "expansion": { "string": "The proposal should have at least two options"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "CTV_WRONG_OPTION"}, 
+            "expansion": { "string": "The proposal does not have the voted option"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "CTV_WRONG_VOTING_PERIOD"}, 
+            "expansion": { "string": "The voting_period parameter cannot be shorter than 2 days"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "CTV_WRONG_MINIMUM_VOTES"}, 
+            "expansion": { "string": "The minimum_votes parameter cannot be smaller than 2 votes"},
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CTV_NO_USER_VOTE"}, 
+            "expansion": { "string": "The user didn't vote for the proposal"},
+            "languages": ["en"] 
+        }
+    ]
+}

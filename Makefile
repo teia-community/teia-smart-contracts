@@ -73,6 +73,7 @@ compile_all:
 	$(call COMPILE, daoTreasury)
 	$(call COMPILE, representatives)
 	$(call COMPILE, daoMultisig)
+	$(call COMPILE, coreTeamVote)
 	$(call COMPILE, harbergerToken)
 	$(call COMPILE, harbergerFee)
 	$(call COMPILE, harbergerMinter)
