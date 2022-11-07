@@ -14,6 +14,7 @@
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
+| [Teia Core Team vote](python/contracts/coreTeamVote.py) | | Prototype |
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
 | [Harberger token minter](python/contracts/harbergerMinter.py) | | Prototype |
@@ -22,6 +23,7 @@
 | [Subscriptions marketplace](python/contracts/subscriptionsMarketplace.py) | | Prototype |
 | [Contract for donation campaigns](python/contracts/donations.py) | | Prototype |
 | [Contract for signing open letters](python/contracts/openLetter.py) | | Prototype |
+| [Contract for creating polls](python/contracts/tezosPolls.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -57,6 +59,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/subscriptionsMarketplace.py ../output/contracts/subscriptionsMarketplace --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/donations.py ../output/contracts/donations --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/openLetter.py ../output/contracts/openLetter --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/tezosPolls.py ../output/contracts/tezosPolls --html --purge
 ```
 
 ## Execute the tests

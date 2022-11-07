@@ -17,17 +17,17 @@ class CoreTeamVote(sp.Contract):
         issuer=sp.TAddress,
         # The time when the proposal was submitted
         timestamp=sp.TTimestamp,
-        # The proposal short description
-        description=sp.TString,
+        # The proposal title
+        title=sp.TBytes,
         # The ipfs link with the text describing the proposal
-        text=sp.TString,
+        description=sp.TBytes,
         # The proposal voting options
-        options=sp.TMap(sp.TNat, sp.TString),
+        options=sp.TMap(sp.TNat, sp.TBytes),
         # The proposal voting period in days
         voting_period=sp.TNat,
         # The minimum number of votes needed to approve the proposal
         minimum_votes=sp.TNat).layout(
-            ("issuer", ("timestamp", ("description", ("text", ("options", ("voting_period", "minimum_votes")))))))
+            ("issuer", ("timestamp", ("title", ("description", ("options", ("voting_period", "minimum_votes")))))))
 
     def __init__(self, metadata, core_team_multisig, minimum_votes):
         """Initializes the contract.
@@ -76,11 +76,11 @@ class CoreTeamVote(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
-            description=sp.TString,
-            text=sp.TString,
-            options=sp.TMap(sp.TNat, sp.TString),
+            title=sp.TBytes,
+            description=sp.TBytes,
+            options=sp.TMap(sp.TNat, sp.TBytes),
             voting_period=sp.TNat).layout(
-                ("description", ("text", ("options", "voting_period")))))
+                ("title", ("description", ("options", "voting_period")))))
 
         # Check that one of the Core Team users executed the entry point
         self.check_is_user()
@@ -95,8 +95,8 @@ class CoreTeamVote(sp.Contract):
         self.data.proposals[self.data.counter] = sp.record(
             issuer=sp.sender,
             timestamp=sp.now,
+            title=params.title,
             description=params.description,
-            text=params.text,
             options=params.options,
             voting_period=params.voting_period,
             minimum_votes=self.data.minimum_votes)

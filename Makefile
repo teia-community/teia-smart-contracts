@@ -82,6 +82,7 @@ compile_all:
 	$(call COMPILE, subscriptionsMarketplace)
 	$(call COMPILE, donations)
 	$(call COMPILE, openLetter)
+	$(call COMPILE, tezosPolls)
 
 test_all:
 	$(call TEST, teiaMarketplace_v1)
