@@ -16,15 +16,13 @@ class TezosPolls(sp.Contract):
         issuer=sp.TAddress,
         # The time when the poll was submitted
         timestamp=sp.TTimestamp,
-        # The poll title
-        title=sp.TBytes,
-        # The ipfs link with the text describing the poll
-        description=sp.TBytes,
+        # The poll question
+        question=sp.TBytes,
         # The poll voting options
         options=sp.TMap(sp.TNat, sp.TBytes),
         # The poll voting period in days
         voting_period=sp.TNat).layout(
-            ("issuer", ("timestamp", ("title", ("description", ("options", "voting_period"))))))
+            ("issuer", ("timestamp", ("question", ("options", "voting_period")))))
 
     def __init__(self, metadata):
         """Initializes the contract.
@@ -38,6 +36,8 @@ class TezosPolls(sp.Contract):
             polls=sp.TBigMap(sp.TNat, TezosPolls.POLL_TYPE),
             # The big map with the votes information
             votes=sp.TBigMap(sp.TPair(sp.TNat, sp.TAddress), sp.TNat),
+            # The big map with the polls current results
+            results=sp.TBigMap(sp.TPair(sp.TNat, sp.TNat), sp.TNat),
             # The polls bigmap counter
             counter=sp.TNat))
 
@@ -46,6 +46,7 @@ class TezosPolls(sp.Contract):
             metadata=metadata,
             polls=sp.big_map(),
             votes=sp.big_map(),
+            results=sp.big_map(),
             counter=0)
 
     @sp.entry_point
@@ -55,24 +56,23 @@ class TezosPolls(sp.Contract):
         """
         # Define the input parameter data type
         sp.set_type(params, sp.TRecord(
-            title=sp.TBytes,
-            description=sp.TBytes,
+            question=sp.TBytes,
             options=sp.TMap(sp.TNat, sp.TBytes),
             voting_period=sp.TNat).layout(
-                ("title", ("description", ("options", "voting_period")))))
+                ("question", ("options", "voting_period"))))
 
         # Check that there are at least two options to vote
         sp.verify(sp.len(params.options) > 1, message="POLL_WRONG_OPTIONS")
 
-        # Check that the voting period is longer than one day
-        sp.verify(params.voting_period > 1, message="POLL_WRONG_VOTING_PERIOD")
+        # Check that the voting period is between 1 and 5 days
+        sp.verify((params.voting_period >= 1) & (params.voting_period <= 5),
+                  message="POLL_WRONG_VOTING_PERIOD")
 
         # Update the polls bigmap with the new poll information
         self.data.polls[self.data.counter] = sp.record(
             issuer=sp.sender,
             timestamp=sp.now,
-            title=params.title,
-            description=params.description,
+            question=params.question,
             options=params.options,
             voting_period=params.voting_period)
 
@@ -100,8 +100,22 @@ class TezosPolls(sp.Contract):
         sp.verify(poll.options.contains(params.option),
                   message="POLL_WRONG_OPTION")
 
+        # Check if the user voted before and remove their previous vote from the
+        # results big map
+        vote_key = sp.compute(sp.pair(params.poll_id, sp.sender))
+
+        with sp.if_(self.data.votes.contains(vote_key)):
+            previous_option = sp.compute(self.data.votes[vote_key])
+            self.data.results[(params.poll_id, previous_option)] = sp.as_nat(
+                self.data.results[(params.poll_id, previous_option)] - 1)
+
         # Add or update the user's vote
-        self.data.votes[(params.poll_id, sp.sender)] = params.option
+        self.data.votes[vote_key] = params.option
+
+        # Add the vote to the poll results
+        result_key = sp.compute(sp.pair(params.poll_id, params.option))
+        self.data.results[result_key] = 1 + self.data.results.get(
+            result_key, default_value=0)
 
     @sp.onchain_view()
     def get_poll_count(self):
@@ -158,4 +172,4 @@ class TezosPolls(sp.Contract):
 
 # Add a compilation target
 sp.add_compilation_target("tezosPolls", TezosPolls(
-    metadata=sp.utils.metadata_of_url("ipfs://QmVGVvVQBEgKA8meTq8QsRvTx4o9iKA1q3Nof7XdL3PcMB")))
+    metadata=sp.utils.metadata_of_url("ipfs://QmdTcVEy8afc2paFRvvQdoK6hn8CDmEmKCsFeW3GV3aCJi")))

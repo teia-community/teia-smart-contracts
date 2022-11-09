@@ -1,0 +1,48 @@
+{
+    "name": "Tezos polls",
+    "description": "Smart contract where any tezos user can create and vote polls",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Javier Gracia Carpip <https://twitter.com/jagracar>"],
+    "homepage": "https://jagracar.com",
+    "source": {
+        "tools": ["SmartPy 0.15.0"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/tezosPolls.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "INEXISTENT_POLL"}, 
+            "expansion": { "string": "The given poll id doesn't exist"},
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CLOSED_POLL"}, 
+            "expansion": { "string": "The poll voting period has passed and it cannot be voted anymore"},
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "POLL_WRONG_OPTIONS"}, 
+            "expansion": { "string": "The poll should have at least two options"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "POLL_WRONG_OPTION"}, 
+            "expansion": { "string": "The poll does not have the voted option"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "POLL_WRONG_VOTING_PERIOD"}, 
+            "expansion": { "string": "The voting_period parameter should be between 1 and 5 days"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "NO_USER_VOTE"}, 
+            "expansion": { "string": "The user didn't vote in the poll"},
+            "languages": ["en"] 
+        }
+    ]
+}
