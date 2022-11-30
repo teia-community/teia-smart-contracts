@@ -24,6 +24,7 @@
 | [Contract for donation campaigns](python/contracts/donations.py) | | Prototype |
 | [Contract for signing open letters](python/contracts/openLetter.py) | | Prototype |
 | [Contract for creating polls](python/contracts/tezosPolls.py) | | Prototype |
+| [A dead's man switch contract](python/contracts/deadMansSwitch.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -60,6 +61,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/donations.py ../output/contracts/donations --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/openLetter.py ../output/contracts/openLetter --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/tezosPolls.py ../output/contracts/tezosPolls --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/deadMansSwitch.py ../output/contracts/deadMansSwitch --html --purge
 ```
 
 ## Execute the tests
