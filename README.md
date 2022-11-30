@@ -79,4 +79,5 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/daoGovernance_test.py ../output/tests/daoGovernance --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/representatives_test.py ../output/tests/representatives --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/daoMultisig_test.py ../output/tests/daoMultisig --html --purge
+~/smartpy-cli/SmartPy.sh test tests/deadMansSwitch_test.py ../output/tests/deadMansSwitch --html --purge
 ```

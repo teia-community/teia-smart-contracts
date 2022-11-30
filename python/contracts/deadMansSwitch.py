@@ -265,8 +265,28 @@ class DeadMansSwitch(sp.Contract):
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
+        # Check that the ping interval is larger than 1 day
+        sp.verify(ping_interval > 0, message="DM_INVALID_PING_INTERVAL")
+
         # Set the new ping interval
         self.data.ping_interval = ping_interval
+
+        # Update the last ping timestamp parameter
+        self.data.last_ping = sp.now
+
+    @sp.entry_point
+    def set_delegate(self, new_baker):
+        """Delegates the contract stored tez to the given baker address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_baker, sp.TOption(sp.TKeyHash))
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Update the baker address
+        sp.set_delegate(new_baker)
 
         # Update the last ping timestamp parameter
         self.data.last_ping = sp.now
