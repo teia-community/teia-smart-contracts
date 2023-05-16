@@ -30,7 +30,7 @@
 ## SmartPy installation
 
 ```bash
-wget https://smartpy.io/cli/install.sh
+wget https://legacy.smartpy.io/cli/install.sh
 bash ./install.sh
 rm install.sh
 ```

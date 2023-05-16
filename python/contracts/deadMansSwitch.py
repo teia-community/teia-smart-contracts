@@ -114,19 +114,21 @@ class DeadMansSwitch(sp.Contract):
 
     @sp.entry_point
     def transfer_tez(self, params):
-        """Transfers a given tez amount to the provided destination address.
+        """Transfers the given tez amounts to the provided destination
+        addresses.
 
         """
         # Define the input parameter data type
-        sp.set_type(params, sp.TRecord(
+        sp.set_type(params, sp.TList(sp.TRecord(
             amount=sp.TMutez,
-            destination=sp.TAddress))
+            destination=sp.TAddress)))
 
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
         # Transfer the tez
-        sp.send(params.destination, params.amount)
+        with sp.for_("mutez_transfer", params) as mutez_transfer:
+            sp.send(mutez_transfer.destination, mutez_transfer.amount)
 
         # Update the last ping timestamp parameter
         self.data.last_ping = sp.now

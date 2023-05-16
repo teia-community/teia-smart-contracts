@@ -53,29 +53,13 @@ def get_test_environment():
     deadMansSwitch.set_initial_balance(sp.tez(10))
     scenario += deadMansSwitch
 
-    # Create the FA2 token contract and add it to the test scenario
-    fa2_admin = sp.test_account("fa2_admin")
-    fa2 = fa2Module.FA2(
-        config=fa2Module.FA2_config(),
-        admin=fa2_admin.address,
-        meta=sp.utils.metadata_of_url("ipfs://aaa"))
-    scenario += fa2
-
-    # Mint one token
-    fa2.mint(
-        address=admin.address,
-        token_id=sp.nat(0),
-        amount=sp.nat(100),
-        token_info={"": sp.utils.bytes_of_string("ipfs://bbb")}).run(sender=fa2_admin)
-
     # Save all the variables in a test environment dictionary
     testEnvironment = {
         "scenario": scenario,
         "admin": admin,
         "multisig": multisig,
         "other": other,
-        "deadMansSwitch": deadMansSwitch,
-        "fa2": fa2}
+        "deadMansSwitch": deadMansSwitch}
 
     return testEnvironment
 
@@ -116,29 +100,33 @@ def test_transfer_tezt():
 
     # Create the account that will receive the tez transfers and add it to the
     # scenario
-    recipient = Recipient()
-    scenario += recipient
+    recipient1 = Recipient()
+    recipient2 = Recipient()
+    scenario += recipient1
+    scenario += recipient2
 
     # Check that the admin is able to transfer tez
-    deadMansSwitch.transfer_tez(
-        amount=sp.tez(1),
-        destination=recipient.address).run(sender=admin, now=sp.timestamp(10))
+    deadMansSwitch.transfer_tez([
+        sp.record(amount=sp.tez(1), destination=recipient1.address),
+        sp.record(amount=sp.tez(2), destination=recipient2.address)]).run(sender=admin, now=sp.timestamp(10))
 
     # Check that the correct tez amount has been sent
-    scenario.verify(recipient.balance == sp.tez(1))
-    scenario.verify(deadMansSwitch.balance == sp.tez(10 - 1))
+    scenario.verify(recipient1.balance == sp.tez(1))
+    scenario.verify(recipient2.balance == sp.tez(2))
+    scenario.verify(deadMansSwitch.balance == sp.tez(10 - 1 - 2))
 
     # Check that the last ping timestamp has been updated
     scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(10))
 
     # Check that other users cannot transfer tez from the contract
-    deadMansSwitch.transfer_tez(
-        amount=sp.tez(1),
-        destination=recipient.address).run(valid=False, sender=multisig)
-
-    deadMansSwitch.transfer_tez(
-        amount=sp.tez(1),
-        destination=recipient.address).run(valid=False, sender=other)
+    deadMansSwitch.transfer_tez([
+        sp.record(amount=sp.tez(1), destination=recipient1.address),
+        sp.record(amount=sp.tez(2), destination=recipient2.address)]).run(
+            valid=False, sender=multisig, exception="DM_NOT_ADMIN")
+    deadMansSwitch.transfer_tez([
+        sp.record(amount=sp.tez(1), destination=recipient1.address),
+        sp.record(amount=sp.tez(2), destination=recipient2.address)]).run(
+            valid=False, sender=other, exception="DM_NOT_ADMIN")
 
 
 @sp.add_test(name="Test transfer fa2 token")
@@ -150,18 +138,32 @@ def test_transfer_fa2_token():
     multisig = testEnvironment["multisig"]
     other = testEnvironment["other"]
     deadMansSwitch = testEnvironment["deadMansSwitch"]
-    fa2 = testEnvironment["fa2"]
+
+    # Create the FA2 token contract and add it to the test scenario
+    fa2_admin = sp.test_account("fa2_admin")
+    fa2 = fa2Module.FA2(
+        config=fa2Module.FA2_config(),
+        admin=fa2_admin.address,
+        meta=sp.utils.metadata_of_url("ipfs://aaa"))
+    scenario += fa2
+
+    # Mint one token
+    fa2.mint(
+        address=other.address,
+        token_id=sp.nat(0),
+        amount=sp.nat(100),
+        token_info={"": sp.utils.bytes_of_string("ipfs://bbb")}).run(sender=fa2_admin)
 
     # Transfer some tokens to the contract
     fa2.transfer(sp.list([sp.record(
-        from_=admin.address,
+        from_=other.address,
         txs=sp.list([sp.record(
             to_=deadMansSwitch.address,
             token_id=0,
-            amount=20)]))])).run(sender=admin)
+            amount=20)]))])).run(sender=other)
 
     # Check that the token ledger information is correct
-    scenario.verify(fa2.data.ledger[(admin.address, 0)].balance == 100 - 20)
+    scenario.verify(fa2.data.ledger[(other.address, 0)].balance == 100 - 20)
     scenario.verify(fa2.data.ledger[(deadMansSwitch.address, 0)].balance == 20)
 
     # Check that the admin is able to transfer some token editions
@@ -169,12 +171,12 @@ def test_transfer_fa2_token():
         token_address=fa2.address,
         token_id=sp.some(0),
         amount=10,
-        destination=other.address).run(sender=admin, now=sp.timestamp(10))
+        destination=multisig.address).run(sender=admin, now=sp.timestamp(10))
 
     # Check that the token ledger information is correct
-    scenario.verify(fa2.data.ledger[(admin.address, 0)].balance == 100 - 20)
+    scenario.verify(fa2.data.ledger[(other.address, 0)].balance == 100 - 20)
     scenario.verify(fa2.data.ledger[(deadMansSwitch.address, 0)].balance == 20 - 10)
-    scenario.verify(fa2.data.ledger[(other.address, 0)].balance == 10)
+    scenario.verify(fa2.data.ledger[(multisig.address, 0)].balance == 10)
 
     # Check that the last ping timestamp has been updated
     scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(10))
@@ -184,10 +186,178 @@ def test_transfer_fa2_token():
         token_address=fa2.address,
         token_id=sp.some(0),
         amount=10,
-        destination=other.address).run(valid=False, sender=multisig)
-
+        destination=other.address).run(
+            valid=False, sender=multisig, exception="DM_NOT_ADMIN")
     deadMansSwitch.transfer_tokens(
         token_address=fa2.address,
         token_id=sp.some(0),
         amount=10,
-        destination=other.address).run(valid=False, sender=other)
+        destination=other.address).run(
+            valid=False, sender=other, exception="DM_NOT_ADMIN")
+
+
+@sp.add_test(name="Test ping")
+def test_ping():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    multisig = testEnvironment["multisig"]
+    other = testEnvironment["other"]
+    deadMansSwitch = testEnvironment["deadMansSwitch"]
+
+    # The admin pings the contract
+    deadMansSwitch.ping().run(sender=admin, now=sp.timestamp(10))
+
+    # Check that the last ping timestamp has been updated
+    scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(10))
+
+    # Check that other users cannot ping the contract
+    deadMansSwitch.ping().run(
+        valid=False, sender=multisig, now=sp.timestamp(20), exception="DM_NOT_ADMIN")
+    deadMansSwitch.ping().run(
+        valid=False, sender=other, now=sp.timestamp(20), exception="DM_NOT_ADMIN")
+
+    # The admin pings the contract again
+    deadMansSwitch.ping().run(sender=admin, now=sp.timestamp(30))
+
+    # Check that the last ping timestamp has been updated
+    scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(30))
+
+
+@sp.add_test(name="Test take control")
+def test_take_control():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    multisig = testEnvironment["multisig"]
+    other = testEnvironment["other"]
+    deadMansSwitch = testEnvironment["deadMansSwitch"]
+
+    # The admin pings the contract
+    deadMansSwitch.ping().run(sender=admin, now=sp.timestamp(10))
+
+    # Check that the last ping timestamp has been updated
+    scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(10))
+
+    # Check that the multisig cannot take control too early
+    deadMansSwitch.take_control().run(
+        valid=False, sender=multisig, now=sp.timestamp(20), exception="DM_NOT_DEAD")
+    deadMansSwitch.take_control().run(
+        valid=False, sender=multisig, now=sp.timestamp(10 - 1).add_days(
+            sp.to_int(deadMansSwitch.data.ping_interval)), exception="DM_NOT_DEAD")
+
+    # Check that only the multisig cannot take control when the last ping is too old
+    timestamp = sp.timestamp(
+        10 + 1).add_days(sp.to_int(deadMansSwitch.data.ping_interval))
+    deadMansSwitch.take_control().run(
+        valid=False, sender=admin, now=timestamp, exception="DM_NOT_MULTISIG")
+    deadMansSwitch.take_control().run(
+        valid=False, sender=other, now=timestamp, exception="DM_NOT_MULTISIG")
+    deadMansSwitch.take_control().run(sender=multisig, now=timestamp)
+
+    # Check that the multisig is the new admin and the last ping has been updated
+    scenario.verify(deadMansSwitch.data.administrator == multisig.address)
+    scenario.verify(deadMansSwitch.data.last_ping == timestamp)
+
+
+@sp.add_test(name="Test transfer and accept administrator")
+def test_transfer_and_accept_administrator():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    multisig = testEnvironment["multisig"]
+    other = testEnvironment["other"]
+    deadMansSwitch = testEnvironment["deadMansSwitch"]
+
+    # Check the original administrator
+    scenario.verify(deadMansSwitch.data.administrator == admin.address)
+
+    # Check that only the admin can transfer the administrator
+    new_administrator = other.address
+    deadMansSwitch.transfer_administrator(new_administrator).run(
+        valid=False, sender=multisig, exception="DM_NOT_ADMIN")
+    deadMansSwitch.transfer_administrator(new_administrator).run(
+        valid=False, sender=other, exception="DM_NOT_ADMIN")
+    deadMansSwitch.transfer_administrator(new_administrator).run(sender=admin)
+
+    # Check that the proposed administrator is updated
+    scenario.verify(deadMansSwitch.data.proposed_administrator.open_some() == new_administrator)
+
+    # Check that only the proposed administrator can accept the administrator position
+    deadMansSwitch.accept_administrator().run(
+        valid=False, sender=admin, exception="DM_NOT_PROPOSED_ADMIN")
+    deadMansSwitch.accept_administrator().run(
+        valid=False, sender=multisig, exception="DM_NOT_PROPOSED_ADMIN")
+    deadMansSwitch.accept_administrator().run(sender=other)
+
+    # Check that the administrator is updated
+    scenario.verify(deadMansSwitch.data.administrator == new_administrator)
+    scenario.verify(~deadMansSwitch.data.proposed_administrator.is_some())
+
+    # Check that only the new administrator can propose a new administrator
+    new_administrator = multisig.address
+    deadMansSwitch.transfer_administrator(new_administrator).run(
+        valid=False, sender=admin, exception="DM_NOT_ADMIN")
+    deadMansSwitch.transfer_administrator(new_administrator).run(sender=other)
+
+    # Check that the proposed administrator is updated
+    scenario.verify(deadMansSwitch.data.proposed_administrator.open_some() == new_administrator)
+
+
+@sp.add_test(name="Test set multisig")
+def test_set_multisig():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    multisig = testEnvironment["multisig"]
+    other = testEnvironment["other"]
+    deadMansSwitch = testEnvironment["deadMansSwitch"]
+
+    # Check that only the admin can update the multisig address
+    new_multisig = other.address
+    deadMansSwitch.set_multisig(new_multisig).run(
+        valid=False, sender=multisig, now=sp.timestamp(20), exception="DM_NOT_ADMIN")
+    deadMansSwitch.set_multisig(new_multisig).run(
+        valid=False, sender=other, now=sp.timestamp(20), exception="DM_NOT_ADMIN")
+    deadMansSwitch.set_multisig(new_multisig).run(
+        sender=admin, now=sp.timestamp(20))
+
+    # Check that the multisig address is updated
+    scenario.verify(deadMansSwitch.data.multisig == new_multisig)
+
+    # Check that the last ping timestamp has been updated
+    scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(20))
+
+
+@sp.add_test(name="Test set ping interval")
+def test_set_ping_interval():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    multisig = testEnvironment["multisig"]
+    other = testEnvironment["other"]
+    deadMansSwitch = testEnvironment["deadMansSwitch"]
+
+    # Check that only the admin can update the ping interval
+    new_ping_interval = 100
+    deadMansSwitch.set_ping_interval(new_ping_interval).run(
+        valid=False, sender=multisig, now=sp.timestamp(20), exception="DM_NOT_ADMIN")
+    deadMansSwitch.set_ping_interval(new_ping_interval).run(
+        valid=False, sender=other, now=sp.timestamp(20), exception="DM_NOT_ADMIN")
+    deadMansSwitch.set_ping_interval(new_ping_interval).run(
+        sender=admin, now=sp.timestamp(20))
+
+    # Check that the ping interval is updated
+    scenario.verify(deadMansSwitch.data.ping_interval == new_ping_interval)
+
+    # Check that the last ping timestamp has been updated
+    scenario.verify(deadMansSwitch.data.last_ping == sp.timestamp(20))
+
+    # Check that it's not possible to set the ping interval to 0
+    deadMansSwitch.set_ping_interval(0).run(
+        valid=False, sender=admin, now=sp.timestamp(30), exception="DM_INVALID_PING_INTERVAL")

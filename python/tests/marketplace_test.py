@@ -208,11 +208,11 @@ def test_swap_and_collect():
 
     # Check that all the tez have been sent and the swaps big map has been updated
     scenario.verify(marketplace.balance == sp.mutez(0))
-    scenario.verify(fee_recipient.balance == sp.mul(2, sp.split_tokens(price, 25, 1000)))
-    scenario.verify(org1.balance == sp.mul(2, sp.split_tokens(price, 100, 1000)))
-    scenario.verify(org2.balance == sp.mul(2, sp.split_tokens(price, 300, 1000)))
-    scenario.verify(artist2.balance == sp.mul(2, sp.split_tokens(price, royalties, 1000)))
-    scenario.verify(artist1.balance == sp.mul(2, price - 
+    scenario.verify(fee_recipient.balance == sp.mul(sp.nat(2), sp.split_tokens(price, 25, 1000)))
+    scenario.verify(org1.balance == sp.mul(sp.nat(2), sp.split_tokens(price, 100, 1000)))
+    scenario.verify(org2.balance == sp.mul(sp.nat(2), sp.split_tokens(price, 300, 1000)))
+    scenario.verify(artist2.balance == sp.mul(sp.nat(2), sp.split_tokens(price, royalties, 1000)))
+    scenario.verify(artist1.balance == sp.mul(sp.nat(2), price - 
                                               sp.split_tokens(price, 25, 1000) - 
                                               sp.split_tokens(price, 100, 1000) - 
                                               sp.split_tokens(price, 300, 1000) - 

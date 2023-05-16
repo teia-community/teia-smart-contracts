@@ -4,7 +4,7 @@ from os import environ
 
 class DAOToken(sp.Contract):
     """This contract adapts the FA2 contract template example in smartpy.io
-    v0.9.1 to be used as a DAO token.
+    v0.9.1 to use it as a DAO token.
 
     The FA2 template was originally developed by Seb Mondet:
     https://gitlab.com/smondet/fa2-smartpy
@@ -12,9 +12,12 @@ class DAOToken(sp.Contract):
     The contract follows the FA2 standard specification:
     https://gitlab.com/tezos/tzip/-/blob/master/proposals/tzip-12/tzip-12.md
 
-    The contract makes used of the Kolibri DAO implementation of token balance
+    The contract makes use of the Kolibri DAO implementation of token balance
     checkpoints:
     https://github.com/Hover-Labs/murmuration/blob/main/docs/token.md
+
+    The token has no mint entry point. All tokens will be minted at origination.
+    That means that the total supply is fixed and cannot be changed.
 
     """
 
@@ -43,19 +46,19 @@ class DAOToken(sp.Contract):
     CHECKPOINT_VALUE_TYPE = sp.TRecord(
         # The block level where the checkpoint was taken
         level=sp.TNat,
-        # The owner token balance
+        # The owner token balance at that block level
         balance=sp.TNat).layout(
             ("level", "balance"))
 
     # Basis for contract instance metadata
     CONTRACT_METADATA_BASE = {
-        "name": "Teia Community DAO FA2 token contract",
-        "description": "A basic DAO token contract for the Teia Community DAO",
+        "name": "Teia DAO FA2 token contract",
+        "description": "DAO token contract used in the Teia DAO",
         "version": "1.0.0",
         "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
         "homepage": "https://teia.art",
         "source": {
-            "tools": ["SmartPy 0.10.0"],
+            "tools": ["SmartPy 0.16.0"],
             "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
         },
         "interfaces": ["TZIP-012", "TZIP-016"],
@@ -100,7 +103,8 @@ class DAOToken(sp.Contract):
         }
     }
 
-    def __init__(self, administrator, metadata, token_metadata, supply, max_share):
+    def __init__(self, administrator, metadata, token_metadata, supply,
+                 max_share):
         """Initializes the contract.
 
         """
