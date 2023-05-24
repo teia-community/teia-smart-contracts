@@ -36,7 +36,7 @@
         },
         {
             "error": { "string": "FA2_INSUFFICIENT_BALANCE"}, 
-            "expansion": { "string": "The account doesn't have enough token editions'"},
+            "expansion": { "string": "The account doesn't have enough token editions"},
             "languages": ["en"] 
         },
         {
