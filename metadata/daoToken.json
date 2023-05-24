@@ -1,6 +1,6 @@
 {
     "name": "Teia DAO FA2 token prototype",
-    "description": "The token prototype that will be used in the Teia Community DAO",
+    "description": "Prototype DAO token contract used in the Teia DAO",
     "version": "1.0.0",
     "license": {
         "name": "MIT",
@@ -9,7 +9,7 @@
     "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
     "homepage": "https://teia.art",
     "source": {
-        "tools": ["SmartPy 0.10.0"],
+        "tools": ["SmartPy 0.16.0"],
         "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
     },
     "interfaces": ["TZIP-012", "TZIP-016"],
@@ -26,12 +26,7 @@
         },
         {
             "error": { "string": "FA2_SHARE_EXCESS"}, 
-            "expansion": { "string": "The number of total editions in the given account cannot exceed the maximum share value"},
-            "languages": ["en"] 
-        },
-        {
-            "error": { "string": "FA2_SUPPLY_EXCEEDED"}, 
-            "expansion": { "string": "The number of token editions cannot exceed the maximum supply value"},
+            "expansion": { "string": "The number of token editions in the given account cannot exceed the maximum share value"},
             "languages": ["en"] 
         },
         {
@@ -62,6 +57,11 @@
         {
             "error": { "string": "FA2_WRONG_LEVEL"}, 
             "expansion": { "string": "The provided block level is higher thant the current block level"},
+            "languages": ["en"] 
+        },
+        {
+            "error": { "string": "FA2_WRONG_MAX_SHARE"}, 
+            "expansion": { "string": "The value of the max share parameter is not within the expected range"},
             "languages": ["en"] 
         },
         {

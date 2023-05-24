@@ -100,6 +100,7 @@ def test_transfer():
     scenario.verify(~fa2.data.n_checkpoints.contains(user3.address))
     scenario.verify(fa2.data.supply == 1000000000000)
     scenario.verify(fa2.total_supply(0) == 1000000000000)
+    scenario.verify(fa2.data.max_share == 50000000000)
     scenario.verify(fa2.token_metadata(0).token_info[""] == sp.utils.bytes_of_string("ipfs://bbb"))
     scenario.verify(sp.len(fa2.all_tokens()) == 1)
 
@@ -976,7 +977,7 @@ def test_add_max_share_exception():
     fa2.transfer([
         sp.record(
             from_=admin.address,
-            txs=[sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share + 100)])
+            txs=[sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share)])
         ]).run(sender=admin)
 
     # Add user 2 as another exception
@@ -986,11 +987,102 @@ def test_add_max_share_exception():
     fa2.transfer([
         sp.record(
             from_=admin.address,
-            txs=[sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share)])
+            txs=[sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share + 100)])
         ]).run(sender=admin)
 
     # Check that only the admin can add exceptions
     fa2.add_max_share_exception(user3.address).run(valid=False, sender=user2, exception="FA2_NOT_ADMIN")
+
+    # Check that the contract information has been updated
+    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == sp.as_nat(fa2.data.supply - (2 * fa2.data.max_share + 100)))
+    scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == fa2.data.max_share)
+    scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == fa2.data.max_share + 100)
+    scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 0)
+    scenario.verify(fa2.data.max_share_exceptions.contains(user1.address))
+    scenario.verify(fa2.data.max_share_exceptions.contains(user2.address))
+    scenario.verify(~fa2.data.max_share_exceptions.contains(user3.address))
+
+    # Remove user 2 from the exception list
+    fa2.add_max_share_exception(user2.address).run(sender=admin)
+
+    # Check that the exception list contains only the first user
+    scenario.verify(fa2.data.max_share_exceptions.contains(user1.address))
+    scenario.verify(~fa2.data.max_share_exceptions.contains(user2.address))
+    scenario.verify(~fa2.data.max_share_exceptions.contains(user3.address))
+
+    # Check that user 2 can't receive more tokens, but can transfer their tokens
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user2.address, token_id=0, amount=1)])
+        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+    fa2.transfer([
+        sp.record(
+            from_=user2.address,
+            txs=[sp.record(to_=user3.address, token_id=0, amount=10)])
+        ]).run(sender=user2)
+
+    # Check that user 1 can still receive more tokens
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user1.address, token_id=0, amount=1)])
+        ]).run(sender=admin)
+
+    # Check that the contract information has been updated
+    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == sp.as_nat(fa2.data.supply - (2 * fa2.data.max_share + 100 + 1)))
+    scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == fa2.data.max_share + 1)
+    scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == sp.as_nat(fa2.data.max_share + 100 - 10))
+    scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 10)
+
+
+@sp.add_test(name="Test set max share")
+def test_set_max_share():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    user1 = testEnvironment["user1"]
+    user2 = testEnvironment["user2"]
+    user3 = testEnvironment["user3"]
+    fa2 = testEnvironment["fa2"]
+
+    # Check that it's not possible to transfer more than the allowed share of tokens
+    original_max_share = scenario.compute(fa2.data.max_share)
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user1.address, token_id=0, amount=original_max_share)])
+        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+
+    # Check that only the admin can change the max share parameter
+    new_max_share = fa2.data.supply * 3 // 100
+    fa2.set_max_share(new_max_share).run(valid=False, sender=user2, exception="FA2_NOT_ADMIN")
+    fa2.set_max_share(new_max_share).run(sender=admin)
+
+    # Check that the max share is updated
+    scenario.verify(fa2.data.max_share != original_max_share)
+    scenario.verify(fa2.data.max_share == new_max_share)
+
+    # Check that it's not possible to transfer more than the allowed share of tokens
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user1.address, token_id=0, amount=new_max_share)])
+        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+    fa2.transfer([
+        sp.record(
+            from_=admin.address,
+            txs=[sp.record(to_=user1.address, token_id=0, amount=sp.as_nat(new_max_share - 1))])
+        ]).run(sender=admin)
+
+    # Check that the maximum share can only be set within the 1% and 10% limits
+    fa2.set_max_share(sp.as_nat((fa2.data.supply // 100) - 1)).run(
+        valid=False, sender=admin, exception="FA2_WRONG_MAX_SHARE")
+    fa2.set_max_share((fa2.data.supply // 10) + 1).run(
+        valid=False, sender=admin, exception="FA2_WRONG_MAX_SHARE")
+    fa2.set_max_share(fa2.data.supply // 100).run(sender=admin)
+    fa2.set_max_share(fa2.data.supply // 10).run(sender=admin)
 
 
 if ('tzip16_error_lint' in environ.get('TEIA_SC_PARAMS', '').split(':') and

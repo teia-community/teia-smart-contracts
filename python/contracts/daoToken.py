@@ -62,7 +62,7 @@ class DAOToken(sp.Contract):
             "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
         },
         "interfaces": ["TZIP-012", "TZIP-016"],
-        "errors": [{'error': {'string': 'FA2_TOKEN_UNDEFINED'},
+        "errors": [ {'error': {'string': 'FA2_TOKEN_UNDEFINED'},
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']},
                     {'error': {'string': 'FA2_NO_NEW_ADMIN'},
@@ -77,9 +77,6 @@ class DAOToken(sp.Contract):
                     {'error': {'string': 'FA2_SHARE_EXCESS'},
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']},
-                    {'error': {'string': 'FA2_SUPPLY_EXCEEDED'},
-                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
-                     'languages': ['en']},
                     {'error': {'string': 'FA2_NOT_OPERATOR'},
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']},
@@ -90,6 +87,9 @@ class DAOToken(sp.Contract):
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']},
                     {'error': {'string': 'FA2_WRONG_LEVEL'},
+                     'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
+                     'languages': ['en']},
+                    {'error': {'string': 'FA2_WRONG_MAX_SHARE'},
                      'expansion': {'string': 'ERROR_MISSING_EXPANSION'},
                      'languages': ['en']},
                     {'error': {'string': 'FA2_WRONG_MAX_CHECKPOINTS'},
@@ -378,8 +378,8 @@ class DAOToken(sp.Contract):
 
     @sp.entry_point
     def add_max_share_exception(self, exception):
-        """Adds an exception to the set of addresses that can own more tokens
-        than the maximum share.
+        """Adds or removes an exception to the set of addresses that can own
+        more tokens than the maximum share.
 
         """
         # Define the input parameter data type
@@ -388,8 +388,31 @@ class DAOToken(sp.Contract):
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Add the max share exception
-        self.data.max_share_exceptions.add(exception)
+        # Add or remove the max share exception
+        with sp.if_(self.data.max_share_exceptions.contains(exception)):
+            self.data.max_share_exceptions.remove(exception)
+        with sp.else_():
+            self.data.max_share_exceptions.add(exception)
+
+    @sp.entry_point
+    def set_max_share(self, max_share):
+        """Sets the maximum share of tokens that a wallet can own.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(max_share, sp.TNat)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Check that the new max_share value is between 1% and 10% of the token
+        # total supply
+        sp.verify((max_share >= (self.data.supply // 100)) & 
+                  (max_share <= (self.data.supply // 10)),
+                  message="FA2_WRONG_MAX_SHARE")
+
+        # Update the max share
+        self.data.max_share = max_share
 
     @sp.onchain_view(pure=True)
     def get_prior_balance(self, params):
