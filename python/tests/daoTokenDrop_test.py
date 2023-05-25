@@ -33,11 +33,11 @@ proof_user4_1 = [sp.bytes("0x803d9cd47ab3a3997d8a4fee2f2fc0bcc032fb57211490cbb2c
 merkle_root_1 = sp.bytes("0x83e3763b42f4e89fbf5cb200c15ce03f2fe116c912fa7098f9970ff8d3db2ca3")
 
 # Define a second Merkle tree with a second drop distribution
-tokens_user1_2 = 150
-tokens_user2_2 = 250
-tokens_user3_2 = 320
-tokens_user4_2 = 200
-tokens_user5_2 = 123
+tokens_user1_2 = sp.nat(150)
+tokens_user2_2 = sp.nat(250)
+tokens_user3_2 = sp.nat(320)
+tokens_user4_2 = sp.nat(200)
+tokens_user5_2 = sp.nat(123)
 
 proof_user1_2 = [sp.bytes("0xbf463c2dfdbc9e480c34db517415bdeea647f56fdcfe224f1ee22be8fd9c3a89"),
                  sp.bytes("0x485efbfcefebf603f38bcd139c8f5c61a65991cfa87294d9a669acc5b6365cdc"),
@@ -66,6 +66,7 @@ def get_test_environment():
 
     # Create the test accounts
     admin = sp.test_account("admin")
+    treasury = sp.test_account("treasury")
     external_user = sp.test_account("external_user")
 
     # Initialize the DAO token FA2 contract
@@ -82,12 +83,14 @@ def get_test_environment():
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://ccc"),
         token=daoToken.address,
+        treasury=treasury.address,
         merkle_root=merkle_root_1,
         expiration_date=sp.timestamp_from_utc(2022, 12, 31, 23, 59, 59))
     scenario += daoTokenDrop
 
-    # Add the DAO token drop contract as a maximum share exception
+    # Add the DAO token drop contract and the treasury as maximum share exceptions
     daoToken.add_max_share_exception(daoTokenDrop.address).run(sender=admin)
+    daoToken.add_max_share_exception(treasury.address).run(sender=admin)
 
     # Transfer all the editions from the admin to the DAO token drop contract
     daoToken.transfer([
@@ -100,6 +103,7 @@ def get_test_environment():
     testEnvironment = {
         "scenario": scenario,
         "admin": admin,
+        "treasury": treasury,
         "external_user": external_user,
         "daoToken": daoToken,
         "daoTokenDrop": daoTokenDrop}
@@ -207,42 +211,72 @@ def test_claim():
     scenario.verify(daoTokenDrop.claimed_tokens(user4) == 0)
 
 
-@sp.add_test(name="Test transfer")
-def test_transfer():
+@sp.add_test(name="Test transfer to treasury")
+def test_transfer_to_treasury():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    treasury = testEnvironment["treasury"]
     external_user = testEnvironment["external_user"]
     daoToken = testEnvironment["daoToken"]
     daoTokenDrop = testEnvironment["daoTokenDrop"]
 
-    # Check that only the admin can transfer tokens
-    daoTokenDrop.transfer([
-        sp.record(to_=user1, token_id=0, amount=10),
-        sp.record(to_=user4, token_id=0, amount=20),
-        sp.record(to_=external_user.address, token_id=0, amount=30)]).run(
-        valid=False, sender=user1, exception="DROP_NOT_ADMIN")
+    # User 1 and user 2 claim their tokens
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user1_1,
+        leaf=sp.pack(sp.record(address=user1, value=tokens_user1_1)))).run(sender=user1)
+    daoTokenDrop.claim(sp.record(
+        proof=proof_user2_1,
+        leaf=sp.pack(sp.record(address=user2, value=tokens_user2_1)))).run(sender=user2)
 
-    # Transfer the tokens
-    daoTokenDrop.transfer([
-        sp.record(to_=user1, token_id=0, amount=10),
-        sp.record(to_=user4, token_id=0, amount=20),
-        sp.record(to_=external_user.address, token_id=0, amount=30)]).run(sender=admin)
+    # Check that it's not possible to transfer the tokens to the treasury before 
+    # the claim period has expired
+    daoTokenDrop.transfer_to_treasury(sp.nat(100)).run(
+        valid=False, sender=user1, now=sp.timestamp_from_utc(2022, 12, 31, 0, 0, 0), exception="DROP_CLAIM_NOT_EXPIRED")
+
+    # Transfer some tokens to the treasury
+    daoTokenDrop.transfer_to_treasury(sp.nat(100)).run(
+        sender=user1, now=sp.timestamp_from_utc(2023, 1, 1, 0, 0, 0))
+    daoTokenDrop.transfer_to_treasury(sp.nat(200)).run(
+        sender=external_user, now=sp.timestamp_from_utc(2023, 1, 1, 0, 0, 0))
 
     # Check that the contracts information have been updated
-    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == 10)
-    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == 0)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user1, token_id=0)) == tokens_user1_1)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user2, token_id=0)) == tokens_user2_1)
     scenario.verify(daoToken.get_balance(sp.record(owner=user3, token_id=0)) == 0)
-    scenario.verify(daoToken.get_balance(sp.record(owner=user4, token_id=0)) == 20)
-    scenario.verify(daoToken.get_balance(sp.record(owner=external_user.address, token_id=0)) == 30)
+    scenario.verify(daoToken.get_balance(sp.record(owner=user4, token_id=0)) == 0)
     scenario.verify(daoToken.get_balance(sp.record(owner=daoTokenDrop.address, token_id=0)) == sp.as_nat(
-        1500 - 10 - 20 - 30))
-    scenario.verify(daoTokenDrop.claimed_tokens(user1) == 0)
-    scenario.verify(daoTokenDrop.claimed_tokens(user2) == 0)
+        1500 - (tokens_user1_1 + tokens_user2_1 + 300)))
+    scenario.verify(daoToken.get_balance(sp.record(owner=treasury.address, token_id=0)) == 300)
+    scenario.verify(daoTokenDrop.claimed_tokens(user1) == tokens_user1_1)
+    scenario.verify(daoTokenDrop.claimed_tokens(user2) == tokens_user2_1)
     scenario.verify(daoTokenDrop.claimed_tokens(user3) == 0)
     scenario.verify(daoTokenDrop.claimed_tokens(user4) == 0)
-    scenario.verify(daoTokenDrop.claimed_tokens(external_user.address) == 0)
+    scenario.verify(daoTokenDrop.claimed_tokens(treasury.address) == 0)
+
+
+@sp.add_test(name="Test update treasury")
+def test_update_treasury():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    treasury = testEnvironment["treasury"]
+    daoToken = testEnvironment["daoToken"]
+    daoTokenDrop = testEnvironment["daoTokenDrop"]
+
+    # Check the original treasury
+    scenario.verify(daoTokenDrop.data.treasury == treasury.address)
+
+    # Check that only the admin can update the treasury
+    new_treasury = user4
+    daoTokenDrop.update_treasury(new_treasury).run(
+        valid=False, sender=user1, exception="DROP_NOT_ADMIN")
+    daoTokenDrop.update_treasury(new_treasury).run(sender=admin)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoTokenDrop.data.treasury == new_treasury)
 
 
 @sp.add_test(name="Test update merkle root")

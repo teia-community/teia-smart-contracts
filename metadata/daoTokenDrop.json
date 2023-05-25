@@ -1,0 +1,25 @@
+{
+  "name": "Teia DAO token distribution contract prototype",
+  "description": "Prototy token distribution contract used for the Teia DAO",
+  "version": "1.0.0",
+  "authors": [ "Teia Community <https://twitter.com/TeiaCommunity>" ],
+  "homepage": "https://teia.art",
+  "source": { "tools": [ "SmartPy 0.16.0" ], "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoTokenDrop.py" },
+  "interfaces": [ "TZIP-016" ],
+  "errors": [
+    { "error": { "string": "DROP_NOT_ADMIN" }, "expansion": { "string": "The account that executed the entry point is not the contract administrator" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_NO_NEW_ADMIN" }, "expansion": { "string": "The new administrator has not been proposed" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_NOT_PROPOSED_ADMIN" }, "expansion": { "string": "The operation can only be executed by the proposed administrator" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_TEZ_TRANSFER" }, "expansion": { "string": "The operation does not accept tez transfers" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_INVALID_MERKLE_PROOF" }, "expansion": { "string": "The provided Merkle proof is not valid" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_INVALID_LEAF" }, "expansion": { "string": "The provided leaf is not valid" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_SENDER_NOT_LEAF" }, "expansion": { "string": "The wallet that executed the operation is not the one in the leaf" }, "languages": [ "en" ] },
+    {
+      "error": { "string": "DROP_ALL_TOKENS_CLAIMED" },
+      "expansion": { "string": "The wallet that executed the operation has already claimed all their tokens" },
+      "languages": [ "en" ]
+    },
+    { "error": { "string": "DROP_CLAIM_EXPIRED" }, "expansion": { "string": "The token claim period has expired" }, "languages": [ "en" ] },
+    { "error": { "string": "DROP_CLAIM_NOT_EXPIRED" }, "expansion": { "string": "The token claim period has not expired" }, "languages": [ "en" ] }
+  ]
+}

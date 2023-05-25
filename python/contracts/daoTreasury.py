@@ -73,7 +73,7 @@ class DAOTreasury(sp.Contract):
         # Check that the DAO contract executed the entry point
         sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
 
-        # Thansfer the mutez to the list of addresses
+        # Transfer the mutez to the list of addresses
         with sp.for_("mutez_transfer", mutez_transfers) as mutez_transfer:
             sp.send(mutez_transfer.destination, mutez_transfer.amount)
 
@@ -105,7 +105,7 @@ class DAOTreasury(sp.Contract):
             address=token_transfers.fa2,
             entry_point="transfer").open_some()
 
-        # Execute the tranfer
+        # Execute the transfer
         sp.transfer(
             arg=sp.list([sp.record(
                 from_=sp.self_address,

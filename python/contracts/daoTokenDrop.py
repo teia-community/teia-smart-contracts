@@ -11,20 +11,13 @@ class DAOTokenDrop(sp.Contract):
     The main modifications are:
         - Possibility to update the Merkle tree.
         - Introduction of a claim period.
-        - Use of batch transfers, instead of a single transfer.
+        - Introduction of a DAO treasury address that will receive the unclaimed
+          tokens after the claim period has passed.
         - On-chain view to get an address claimed tokens.
 
     """
 
-    FA2_TXS_TYPE = sp.TList(sp.TRecord(
-        # The token destination
-        to_=sp.TAddress,
-        # The token id
-        token_id=sp.TNat,
-        # The number of token editions
-        amount=sp.TNat).layout(("to_", ("token_id", "amount"))))
-
-    def __init__(self, administrator, metadata, token, merkle_root, expiration_date):
+    def __init__(self, administrator, metadata, token, treasury, merkle_root, expiration_date):
         """Initializes the contract.
 
         """
@@ -36,6 +29,8 @@ class DAOTokenDrop(sp.Contract):
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
             # The DAO token address
             token=sp.TAddress,
+            # The DAO treasury address
+            treasury=sp.TAddress,
             # The Merkle tree root associated to the DAO distribution list
             merkle_root=sp.TBytes,
             # The claim period expiration date
@@ -50,10 +45,55 @@ class DAOTokenDrop(sp.Contract):
             administrator=administrator,
             metadata=metadata,
             token=token,
+            treasury=treasury,
             merkle_root=merkle_root,
             expiration_date=expiration_date,
             claimed=sp.big_map(),
             proposed_administrator=sp.none)
+
+        # Fill the contract metadata
+        self.contract_metadata = {
+            "name": "Teia DAO token distribution contract",
+            "description": "Token distribution contract used for the Teia DAO",
+            "version": "1.0.0",
+            "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+            "homepage": "https://teia.art",
+            "source": {
+                "tools": ["SmartPy 0.16.0"],
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoTokenDrop.py"
+            },
+            "interfaces": ["TZIP-016"],
+            "errors": [ {"error": {"string": "DROP_NOT_ADMIN"},
+                         "expansion": {"string": "The account that executed the entry point is not the contract administrator"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_NO_NEW_ADMIN"},
+                         "expansion": {"string": "The new administrator has not been proposed"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_NOT_PROPOSED_ADMIN"},
+                         "expansion": {"string": "The operation can only be executed by the proposed administrator"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_TEZ_TRANSFER"},
+                         "expansion": {"string": "The operation does not accept tez transfers"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_INVALID_MERKLE_PROOF"},
+                         "expansion": {"string": "The provided Merkle proof is not valid"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_INVALID_LEAF"},
+                         "expansion": {"string": "The provided leaf is not valid"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_SENDER_NOT_LEAF"},
+                         "expansion": {"string": "The wallet that executed the operation is not the one in the leaf"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_ALL_TOKENS_CLAIMED"},
+                         "expansion": {"string": "The wallet that executed the operation has already claimed all their tokens"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_CLAIM_EXPIRED"},
+                         "expansion": {"string": "The token claim period has expired"},
+                         "languages": ["en"]},
+                        {"error": {"string": "DROP_CLAIM_NOT_EXPIRED"},
+                         "expansion": {"string": "The token claim period has not expired"},
+                         "languages": ["en"]}]}
+        self.init_metadata("contract_metadata", self.contract_metadata)
 
     def check_is_administrator(self):
         """Checks that the address that called the entry point is the contract
@@ -83,15 +123,20 @@ class DAOTokenDrop(sp.Contract):
         sp.verify(combined_hash.value == self.data.merkle_root,
                   message="DROP_INVALID_MERKLE_PROOF")
 
-    def dao_transfer(self, txs):
-        """Transfers some DAO tokens from the contract to a list of addresses.
+    def dao_transfer(self, address, amount):
+        """Transfers some DAO tokens from the contract to an address.
 
         """
         # Get a handle to the DAO token transfer entry point
         token_transfer_handle = sp.contract(
             t=sp.TList(sp.TRecord(
                 from_=sp.TAddress,
-                txs=DAOTokenDrop.FA2_TXS_TYPE)),
+                txs=sp.TList(sp.TRecord(
+                    to_=sp.TAddress,
+                    token_id=sp.TNat,
+                    amount=sp.TNat).layout(
+                        ("to_", ("token_id", "amount"))))).layout(
+                            ("from_", "txs"))),
             address=self.data.token,
             entry_point="transfer").open_some()
 
@@ -99,7 +144,10 @@ class DAOTokenDrop(sp.Contract):
         sp.transfer(
             arg=sp.list([sp.record(
                 from_=sp.self_address,
-                txs=txs)]),
+                txs=sp.list([sp.record(
+                    to_=address,
+                    token_id=sp.nat(0),
+                    amount=amount)]))]),
             amount=sp.mutez(0),
             destination=token_transfer_handle)
 
@@ -140,27 +188,46 @@ class DAOTokenDrop(sp.Contract):
         self.verify_proof(params.proof, params.leaf)
 
         # Transfer the unclaimed DAO token editions to the sender
-        self.dao_transfer(sp.list([sp.record(
-            to_=sp.sender,
-            token_id=sp.nat(0),
-            amount=unclaimed_tokens)]))
+        self.dao_transfer(sp.sender, unclaimed_tokens)
 
         # Update the claimed big map
         self.data.claimed[sp.sender] = leaf_data.value
 
     @sp.entry_point
-    def transfer(self, txs):
-        """Transfers some DAO tokens to a list of addresses.
+    def transfer_to_treasury(self, amount):
+        """Transfers some DAO tokens to the DAO treasury.
+
+        This entrypoint can be executed by anyone only after the claim period
+        has expired.
 
         """
         # Define the input parameter data type
-        sp.set_type(txs, DAOTokenDrop.FA2_TXS_TYPE)
+        sp.set_type(amount, sp.TNat)
+
+        # Check that the sender didn't transfer any tez
+        sp.verify(sp.amount == sp.tez(0), message="DROP_TEZ_TRANSFER")
+
+        # Check that the claim period has expired
+        sp.verify(sp.now > self.data.expiration_date,
+                  message="DROP_CLAIM_NOT_EXPIRED")
+
+        # Transfer the DAO tokens to the treasury
+        self.dao_transfer(self.data.treasury, amount)
+
+    @sp.entry_point
+    def update_treasury(self, new_treasury):
+        """Updates the DAO treasury address that will receive the unclaimed
+        tokens after the claim period.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_treasury, sp.TAddress)
 
         # Check that the administrator executed the entry point
         self.check_is_administrator()
 
-        # Transfer the DAO tokens
-        self.dao_transfer(txs)
+        # Update the DAO treasury address
+        self.data.treasury = new_treasury
 
     @sp.entry_point
     def update_merkle_root(self, new_merkle_root):
@@ -234,8 +301,9 @@ class DAOTokenDrop(sp.Contract):
 
 
 sp.add_compilation_target("daoTokenDrop", DAOTokenDrop(
-    administrator=sp.address("tz1M9CMEtsXm3QxA7FmMU2Qh7xzsuGXVbcDr"),
-    metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-    token=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa"),
+    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
+    metadata=sp.utils.metadata_of_url("ipfs://QmNhC5Uucwh8TRfzL8xxo2y7RbJVkShuVr8dXCfoFoVCZ5"),
+    token=sp.address("KT1Bdh3NcpSnTy9kPGQLzBr9u51KHfPYqCnN"),
+    treasury=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
     merkle_root=sp.bytes("0x00"),
-    expiration_date=sp.timestamp_from_utc(2022, 10, 30, 23, 59, 59)))
+    expiration_date=sp.timestamp_from_utc(2023, 5, 30, 23, 59, 59)))
