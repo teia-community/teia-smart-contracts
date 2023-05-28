@@ -184,3 +184,20 @@ def test_set_dao():
 
     # Check that the contract information have been updated
     scenario.verify(treasury.data.dao == user.address)
+
+
+@sp.add_test(name="Test set delegate")
+def test_set_delegate():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    dao = testEnvironment["dao"]
+    user = testEnvironment["user"]
+    treasury = testEnvironment["treasury"]
+
+    # Check that only the DAO contract can set the delegate
+    voting_powers = {user.public_key_hash: 0}
+    delegate = sp.some(user.public_key_hash)
+    treasury.set_delegate(delegate).run(
+        valid=False, sender=user, voting_powers=voting_powers, exception="TREASURY_NOT_DAO")
+    treasury.set_delegate(delegate).run(sender=dao, voting_powers=voting_powers)
