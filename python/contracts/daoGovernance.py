@@ -792,7 +792,7 @@ class DAOGovernance(sp.Contract):
                 transfer_token_handle = sp.contract(
                     t=DAOGovernance.TOKEN_TRANSFERS_TYPE,
                     address=self.data.treasury,
-                    entry_point="transfer_token").open_some()
+                    entry_point="transfer_fa2_token").open_some()
 
                 # Execute the transfer
                 sp.transfer(

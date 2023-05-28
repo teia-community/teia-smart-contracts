@@ -10,10 +10,9 @@ class DAOTreasury(sp.Contract):
         # The amount of mutez to transfer
         amount=sp.TMutez,
         # The transfer destination
-        destination=sp.TAddress).layout(
-            ("amount", "destination")))
+        destination=sp.TAddress).layout(("amount", "destination")))
 
-    TOKEN_TRANSFERS_TYPE = sp.TRecord(
+    FA2_TOKEN_TRANSFERS_TYPE = sp.TRecord(
         # The token contract address
         fa2=sp.TAddress,
         # The token id
@@ -25,6 +24,17 @@ class DAOTreasury(sp.Contract):
             # The transfer destination
             destination=sp.TAddress).layout(("amount", "destination")))).layout(
                 ("fa2", ("token_id", "distribution")))
+
+    FA12_TOKEN_TRANSFERS_TYPE = sp.TRecord(
+        # The token contract address
+        fa12=sp.TAddress,
+        # The token transfer distribution
+        distribution=sp.TList(sp.TRecord(
+            # The number of token editions to transfer
+            amount=sp.TNat,
+            # The transfer destination
+            destination=sp.TAddress).layout(("amount", "destination")))).layout(
+                ("fa12", "distribution"))
 
     FA2_TX_TYPE = sp.TRecord(
         # The token destination
@@ -42,13 +52,37 @@ class DAOTreasury(sp.Contract):
         self.init_type(sp.TRecord(
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
-            # The DAO contract address
+            # The DAO governance contract address
             dao=sp.TAddress))
 
         # Initialize the contract storage
         self.init(
             metadata=metadata,
             dao=dao)
+
+        # Fill the contract metadata
+        self.contract_metadata = {
+            "name": "Teia DAO treasury contract",
+            "description": "Treasury contract used for the Teia DAO",
+            "version": "1.0.0",
+            "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+            "homepage": "https://teia.art",
+            "source": {
+                "tools": ["SmartPy 0.16.0"],
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoTreasury.py"
+            },
+            "interfaces": ["TZIP-016"],
+            "errors": [ {"error": {"string": "TREASURY_NOT_DAO"},
+                         "expansion": {"string": "The account that executed the entry point is not the DAO governance contract"},
+                         "languages": ["en"]}]}
+        self.init_metadata("contract_metadata", self.contract_metadata)
+
+    def check_is_dao(self):
+        """Checks that the address that called the entry point is the DAO
+        governance contract.
+
+        """
+        sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
 
     @sp.entry_point
     def default(self, unit):
@@ -71,22 +105,22 @@ class DAOTreasury(sp.Contract):
         sp.set_type(mutez_transfers, DAOTreasury.MUTEZ_TRANSFERS_TYPE)
 
         # Check that the DAO contract executed the entry point
-        sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
+        self.check_is_dao()
 
         # Transfer the mutez to the list of addresses
         with sp.for_("mutez_transfer", mutez_transfers) as mutez_transfer:
             sp.send(mutez_transfer.destination, mutez_transfer.amount)
 
     @sp.entry_point
-    def transfer_token(self, token_transfers):
-        """Transfers a token to a list of addresses.
+    def transfer_fa2_token(self, token_transfers):
+        """Transfers a FA2 token to a list of addresses.
 
         """
         # Define the input parameter data type
-        sp.set_type(token_transfers, DAOTreasury.TOKEN_TRANSFERS_TYPE)
+        sp.set_type(token_transfers, DAOTreasury.FA2_TOKEN_TRANSFERS_TYPE)
 
         # Check that the DAO contract executed the entry point
-        sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
+        self.check_is_dao()
 
         # Build the FA2 transactions list
         txs = sp.local("txs", sp.list(t=DAOTreasury.FA2_TX_TYPE))
@@ -114,6 +148,36 @@ class DAOTreasury(sp.Contract):
             destination=token_transfer_handle)
 
     @sp.entry_point
+    def transfer_fa12_token(self, token_transfers):
+        """Transfers a FA12 token to a list of addresses.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_transfers, DAOTreasury.FA12_TOKEN_TRANSFERS_TYPE)
+
+        # Check that the DAO contract executed the entry point
+        self.check_is_dao()
+
+        # Get a handle to the token transfer entry point
+        token_transfer_handle = sp.contract(
+            t=sp.TRecord(
+                from_=sp.TAddress,
+                to_=sp.TAddress,
+                value=sp.TNat).layout(("from_ as from", ("to_ as to", "value"))),
+            address=token_transfers.fa12,
+            entry_point="transfer").open_some()
+
+        # Execute the transfers
+        with sp.for_("distribution", token_transfers.distribution) as distribution:
+            sp.transfer(
+                arg=sp.record(
+                    from_=sp.self_address,
+                    to_=distribution.destination,
+                    value=distribution.amount),
+                amount=sp.mutez(0),
+                destination=token_transfer_handle)
+
+    @sp.entry_point
     def set_dao(self, new_dao):
         """Updates the DAO contract address.
 
@@ -122,7 +186,7 @@ class DAOTreasury(sp.Contract):
         sp.set_type(new_dao, sp.TAddress)
 
         # Check that the DAO contract executed the entry point
-        sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
+        self.check_is_dao()
 
         # Update the DAO contract address
         self.data.dao = new_dao
@@ -136,7 +200,7 @@ class DAOTreasury(sp.Contract):
         sp.set_type(new_baker, sp.TOption(sp.TKeyHash))
 
         # Check that the DAO contract executed the entry point
-        sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
+        self.check_is_dao()
 
         # Update the baker address
         sp.set_delegate(new_baker)

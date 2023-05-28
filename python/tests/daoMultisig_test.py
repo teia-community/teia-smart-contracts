@@ -102,7 +102,7 @@ def get_test_environment():
     return testEnvironment
 
 
-@sp.add_test(name="Test default entripoint")
+@sp.add_test(name="Test default entrypoint")
 def test_default_entripoint():
     # Get the test environment
     testEnvironment = get_test_environment()
@@ -296,7 +296,7 @@ def test_text_proposal():
     scenario.verify(multisig.data.proposals[0].executed)
 
 
-@sp.add_test(name="Test transter mutez proposal")
+@sp.add_test(name="Test transfer mutez proposal")
 def test_transfer_mutez_proposal():
     # Get the test environment
     testEnvironment = get_test_environment()
@@ -340,7 +340,7 @@ def test_transfer_mutez_proposal():
     scenario.verify(recipient2.balance == sp.tez(2))
 
 
-@sp.add_test(name="Test transter token proposal")
+@sp.add_test(name="Test transfer token proposal")
 def test_transfer_token_proposal():
     # Get the test environment
     testEnvironment = get_test_environment()
