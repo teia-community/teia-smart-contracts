@@ -6,6 +6,7 @@ import smartpy as sp
 
 # Import the DAO treasury and fa2 contract modules
 daoTreasuryModule = sp.io.import_script_from_url("file:contracts/daoTreasury.py")
+fa12Module = sp.io.import_script_from_url("file:contracts/fa12.py")
 fa2Module = sp.io.import_script_from_url("file:hen-contracts/fa2.py")
 
 
@@ -163,6 +164,59 @@ def test_transfer_fa2_token():
     scenario.verify(fa2.data.ledger[(treasury.address, 0)].balance == 20 - 5 - 1)
     scenario.verify(fa2.data.ledger[(user2.address, 0)].balance == 5)
     scenario.verify(fa2.data.ledger[(user3.address, 0)].balance == 1)
+
+
+@sp.add_test(name="Test transfer fa12 token")
+def test_transfer_fa12_token():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    dao = testEnvironment["dao"]
+    user = testEnvironment["user"]
+    treasury = testEnvironment["treasury"]
+
+    # Create the FA1.2 token contract and add it to the test scenario
+    admin = sp.test_account("admin")
+    fa12 = fa12Module.FA12(
+        administrator=admin.address,
+        metadata=sp.utils.metadata_of_url("ipfs://aaa"),
+        token_metadata={
+            "decimals": sp.utils.bytes_of_string("18"),
+            "name": sp.utils.bytes_of_string("My Great Token"),
+            "symbol": sp.utils.bytes_of_string("MGT"),
+            "icon": sp.utils.bytes_of_string("ipfs://aaa")})
+    scenario += fa12
+
+    # Mint some token editions
+    fa12.mint(address=user.address, value=sp.nat(100)).run(sender=admin)
+
+    # The user transfers 20 editions of the token to the treasury
+    fa12.transfer(sp.record(
+        from_=user.address,
+        to_=treasury.address,
+        value=20)).run(sender=user)
+
+    # Check that the token balances information is correct
+    scenario.verify(fa12.data.balances[user.address].balance == 100 - 20)
+    scenario.verify(fa12.data.balances[treasury.address].balance == 20)
+
+    # Check that only the DAO contract can transfer the token
+    user2 = sp.test_account("user2")
+    user3 = sp.test_account("user3")
+    token_transfers = sp.record(
+        fa12=fa12.address,
+        distribution=sp.list([
+            sp.record(amount=sp.nat(5), destination=user2.address),
+            sp.record(amount=sp.nat(1), destination=user3.address)]))
+    treasury.transfer_fa12_token(token_transfers).run(
+        valid=False, sender=user, exception="TREASURY_NOT_DAO")
+    treasury.transfer_fa12_token(token_transfers).run(sender=dao)
+
+    # Check that the token ledger information is correct
+    scenario.verify(fa12.data.balances[user.address].balance == 100 - 20)
+    scenario.verify(fa12.data.balances[treasury.address].balance == 20 - 5 - 1)
+    scenario.verify(fa12.data.balances[user2.address].balance == 5)
+    scenario.verify(fa12.data.balances[user3.address].balance == 1)
 
 
 @sp.add_test(name="Test set dao")
