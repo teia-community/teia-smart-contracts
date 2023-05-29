@@ -63,6 +63,7 @@ test:
 compile_all:
 	$(call COMPILE, teiaMarketplace_v1)
 	$(call COMPILE, multisigWallet_v1)
+    $(call COMPILE, fa12)
 	$(call COMPILE, fa2)
 	$(call COMPILE, minter)
 	$(call COMPILE, marketplace)

@@ -5,6 +5,7 @@
 | [Teia Marketplace (v1)](python/contracts/teiaMarketplace_v1.py) | [KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w](https://tzkt.io/KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w) | Audited |
 | [Multisig Wallet / mini-DAO (v1)](python/contracts/multisigWallet_v1.py) | [KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P](https://tzkt.io/KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P) | Audited |
 | [Core Team multisig](python/contracts/daoMultisig.py) | [KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb](https://tzkt.io/KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb) | Deployed |
+| [Extended FA1.2 token](python/contracts/fa12.py) | | Prototype |
 | [Extended FA2 token](python/contracts/fa2.py) | | Prototype |
 | [Extended FA2 token minter](python/contracts/minter.py) | | Prototype |
 | [Marketplace for the extended FA2 token](python/contracts/marketplace.py) | | Prototype |
@@ -41,6 +42,7 @@ rm install.sh
 cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/teiaMarketplace_v1.py ../output/contracts/teiaMarketplace_v1 --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/multisigWallet_v1.py ../output/contracts/multisigWallet_v1 --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/fa12.py ../output/contracts/fa12 --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/fa2.py ../output/contracts/fa2 --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/minter.py ../output/contracts/minter --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/marketplace.py ../output/contracts/marketplace --html --purge
