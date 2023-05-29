@@ -62,6 +62,10 @@ class DAOTokenDrop(sp.Contract):
                 "tools": ["SmartPy 0.16.0"],
                 "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoTokenDrop.py"
             },
+            "license": {
+                "name": "MIT",
+                "details": "The MIT License"
+            },
             "interfaces": ["TZIP-016"],
             "errors": [ {"error": {"string": "DROP_NOT_ADMIN"},
                          "expansion": {"string": "The account that executed the entry point is not the contract administrator"},

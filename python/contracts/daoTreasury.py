@@ -71,6 +71,10 @@ class DAOTreasury(sp.Contract):
                 "tools": ["SmartPy 0.16.0"],
                 "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoTreasury.py"
             },
+            "license": {
+                "name": "MIT",
+                "details": "The MIT License"
+            },
             "interfaces": ["TZIP-016"],
             "errors": [ {"error": {"string": "TREASURY_NOT_DAO"},
                          "expansion": {"string": "The account that executed the entry point is not the DAO governance contract"},
@@ -207,5 +211,5 @@ class DAOTreasury(sp.Contract):
 
 
 sp.add_compilation_target("daoTreasury", DAOTreasury(
-    metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-    dao=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa")))
+    metadata=sp.utils.metadata_of_url("ipfs://QmYQZ7WUrVGQjfsGQR2DmkJrw3jPhVb1SLLG4GW8Xfww79"),
+    dao=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN")))

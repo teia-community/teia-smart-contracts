@@ -61,6 +61,10 @@ class DAOToken(sp.Contract):
             "tools": ["SmartPy 0.16.0"],
             "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py"
         },
+        "license": {
+            "name": "MIT",
+            "details": "The MIT License"
+        },
         "interfaces": ["TZIP-012", "TZIP-016"],
         "errors": [ {"error": {"string": "FA2_TOKEN_UNDEFINED"},
                      "expansion": {"string": "The provided token_id doesn't exist"},
