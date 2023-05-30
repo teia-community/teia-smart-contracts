@@ -41,7 +41,7 @@ class Representatives(sp.Contract):
         text=sp.TBytes,
         # A proposal to transfer mutez from the contract to other accounts
         transfer_mutez=MUTEZ_TRANSFERS_TYPE,
-        # A proposal to transfer a token from the contract to other accounts
+        # A proposal to transfer a FA2 token from the contract to other accounts
         transfer_token=TOKEN_TRANSFERS_TYPE,
         # A proposal to execute a lambda function
         lambda_function=LAMBDA_FUNCTION_TYPE,
@@ -79,7 +79,7 @@ class Representatives(sp.Contract):
     FA2_TRANSFER_TYPE = sp.TList(sp.TRecord(
         # The address that sends the token editions
         from_=sp.TAddress,
-        # The list of token trasfers
+        # The list of token transfers
         txs=sp.TList(FA2_TX_TYPE)).layout(
                 ("from_", "txs")))
 
@@ -116,6 +116,60 @@ class Representatives(sp.Contract):
             proposals=sp.big_map(),
             votes=sp.big_map(),
             counter=0)
+
+        # Fill the contract metadata
+        self.contract_metadata = {
+            "name": "Teia representatives multisig wallet / mini-DAO",
+            "description": "Multisig wallet contract used for the Teia representatives",
+            "version": "1.0.0",
+            "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+            "homepage": "https://teia.art",
+            "source": {
+                "tools": ["SmartPy 0.16.0"],
+                "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/representatives.py"
+            },
+            "license": {
+                "name": "MIT",
+                "details": "The MIT License"
+            },
+            "interfaces": ["TZIP-016"],
+            "errors": [ {"error": {"string": "REPS_NOT_REPRESENTATIVE"},
+                         "expansion": {"string": "The operation can only be executed by one of the representatives"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_ADDRESS_EXISTS"},
+                         "expansion": {"string": "The proposed address is already in the representatives list"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_COMMUNITY_EXISTS"},
+                         "expansion": {"string": "The proposed community is already in the representatives list"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_WRONG_ADDRESS"},
+                         "expansion": {"string": "The proposed address is not from a representative"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_WRONG_COMMUNITY"},
+                         "expansion": {"string": "The proposed community is not from a representative"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_WRONG_MINIMUM_VOTES"},
+                         "expansion": {"string": "The minimum_votes parameter cannot be smaller than one or higher than the number of representatives"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_WRONG_EXPIRATION_TIME"},
+                         "expansion": {"string": "The expiration_time parameter cannot be smaller than one day"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_INEXISTENT_PROPOSAL"},
+                         "expansion": {"string": "The given proposal id does not exist"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_EXECUTED_PROPOSAL"},
+                         "expansion": {"string": "The proposal has been executed and cannot be voted or executed anymore"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_EXPIRED_PROPOSAL"},
+                         "expansion": {"string": "The proposal has expired and cannot be voted or executed anymore"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_NOT_EXECUTABLE"},
+                         "expansion": {"string": "The proposal did not receive enough positive votes to be executed"},
+                         "languages": ["en"]},
+                        {"error": {"string": "REPS_LAST_REPRESENTATIVE"},
+                         "expansion": {"string": "The last representative cannot be removed"},
+                         "languages": ["en"]}]}
+        self.init_metadata("contract_metadata", self.contract_metadata)
 
     @sp.entry_point
     def default(self, unit):

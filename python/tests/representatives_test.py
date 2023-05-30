@@ -10,7 +10,7 @@ fa2Module = sp.io.import_script_from_url("file:hen-contracts/fa2.py")
 
 
 class Recipient(sp.Contract):
-    """This contract simulates a user that can recive tez transfers.
+    """This contract simulates a user that can receive tez transfers.
 
     It should only be used to test that tez transfers are sent correctly.
 
@@ -87,13 +87,13 @@ def get_test_environment():
 
     # Save all the variables in a test environment dictionary
     testEnvironment = {
-        "scenario" : scenario,
-        "representative1" : representative1,
-        "representative2" : representative2,
-        "representative3" : representative3,
-        "representative4" : representative4,
-        "non_representative" : non_representative,
-        "representatives" : representatives}
+        "scenario": scenario,
+        "representative1": representative1,
+        "representative2": representative2,
+        "representative3": representative3,
+        "representative4": representative4,
+        "non_representative": non_representative,
+        "representatives": representatives}
 
     return testEnvironment
 
@@ -137,6 +137,10 @@ def test_create_vote_and_execute_proposal():
     scenario.verify(representatives.data.representatives[representative2.address] == "community2")
     scenario.verify(representatives.data.representatives[representative3.address] == "community3")
     scenario.verify(representatives.data.representatives[representative4.address] == "community4")
+    scenario.verify(representatives.get_representative_community(representative1.address) == "community1")
+    scenario.verify(representatives.get_representative_community(representative2.address) == "community2")
+    scenario.verify(representatives.get_representative_community(representative3.address) == "community3")
+    scenario.verify(representatives.get_representative_community(representative4.address) == "community4")
     scenario.verify(~representatives.data.representatives.contains(non_representative.address))
     scenario.verify(sp.len(representatives.data.representatives) == 4)
 
@@ -362,7 +366,7 @@ def test_transfer_token_proposal():
         address=representative1.address,
         token_id=sp.nat(0),
         amount=sp.nat(100),
-        token_info={"" : sp.utils.bytes_of_string("ipfs://bbb")}).run(sender=admin)
+        token_info={"": sp.utils.bytes_of_string("ipfs://bbb")}).run(sender=admin)
 
     # The first representative transfers 20 editions of the token to the representatives
     fa2.transfer(sp.list([sp.record(
@@ -632,3 +636,34 @@ def test_expiration_time_proposal():
 
     # Check that the expiration time parameter has been updated
     scenario.verify(representatives.data.expiration_time == 100)
+
+
+@sp.add_test(name="Test update representative address")
+def test_update_representative_address():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    representative1 = testEnvironment["representative1"]
+    representative2 = testEnvironment["representative2"]
+    representative3 = testEnvironment["representative3"]
+    representative4 = testEnvironment["representative4"]
+    non_representative = testEnvironment["non_representative"]
+    representatives = testEnvironment["representatives"]
+
+    # Check that only a representative can change the representative address
+    representatives.update_representative_address(non_representative.address).run(
+        valid=False, sender=non_representative, exception="REPS_NOT_REPRESENTATIVE")
+    representatives.update_representative_address(non_representative.address).run(
+        sender=representative1)
+
+    # Check that the representative address has been updated
+    scenario.verify(representatives.data.representatives[non_representative.address] == "community1")
+    scenario.verify(representatives.data.representatives[representative2.address] == "community2")
+    scenario.verify(representatives.data.representatives[representative3.address] == "community3")
+    scenario.verify(representatives.data.representatives[representative4.address] == "community4")
+    scenario.verify(representatives.get_representative_community(non_representative.address) == "community1")
+    scenario.verify(representatives.get_representative_community(representative2.address) == "community2")
+    scenario.verify(representatives.get_representative_community(representative3.address) == "community3")
+    scenario.verify(representatives.get_representative_community(representative4.address) == "community4")
+    scenario.verify(~representatives.data.representatives.contains(representative1.address))
+    scenario.verify(sp.len(representatives.data.representatives) == 4)
