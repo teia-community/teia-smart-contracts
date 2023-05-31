@@ -426,7 +426,14 @@ class Representatives(sp.Contract):
 
 
 sp.add_compilation_target("representatives", Representatives(
-    metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-    representatives={sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"): "community1"},
-    minimum_votes=sp.nat(1),
+    metadata=sp.utils.metadata_of_url("ipfs://QmSPr2fiDfnTXq7DemP9Eeh1dhrUwp4QFDDQYUhZKCqnMQ"),
+    representatives={
+        sp.address("tz1YgDUQV2eXm8pUWNz3S5aWP86iFzNp4jnD"): "desperate tezos bakers",
+        sp.address("tz1c5of2FGiz5C5xpKieGAt2abJaz7VwmU9q"): "poor artists community",
+        sp.address("tz1h9TG6uuxv2FtmE5yqMyKQqx8hkXk7NY6c"): "not-so-smart contract devs",
+        sp.address("tz1gpLc1GQ7zMoSkPLcWmGRhEdoekU3ed6Pe"): "IPFS freaks",
+        sp.address("tz1XpohDbFnGbsMqaXtENMHWYYHhMVtBPSTR"): "compulsive writers",
+        sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"): "magnificent overlords"
+    },
+    minimum_votes=sp.nat(2),
     expiration_time=sp.nat(7)))
