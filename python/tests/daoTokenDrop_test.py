@@ -423,6 +423,10 @@ def test_transfer_and_accept_administrator():
     # Check the original administrator
     scenario.verify(daoTokenDrop.data.administrator == admin.address)
 
+    # Check that is not possible to accept the administrator position if it's not set
+    daoTokenDrop.accept_administrator().run(
+        valid=False, sender=admin, exception="DROP_NO_NEW_ADMIN")
+
     # Check that only the admin can transfer the administrator
     new_administrator = user1
     daoTokenDrop.transfer_administrator(new_administrator).run(

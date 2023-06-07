@@ -54,6 +54,8 @@ class DAOGovernance(sp.Contract):
         supermajority=sp.TNat,
         # The representatives vote share percentage relative to the quorum
         representatives_share=sp.TNat,
+        # The vote max share percentage relative to the quorum that a representative can have
+        representative_max_share=sp.TNat,
         # The minimum period between quorum updates in days
         quorum_update_period=sp.TNat,
         # The quorum update percentage
@@ -64,7 +66,7 @@ class DAOGovernance(sp.Contract):
         min_quorum=sp.TNat,
         # The maximum possible quorum value
         max_quorum=sp.TNat).layout(
-            ("vote_method", ("vote_period", ("wait_period", ("escrow_amount", ("escrow_return", ("min_amount", ("supermajority", ("representatives_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum")))))))))))))
+            ("vote_method", ("vote_period", ("wait_period", ("escrow_amount", ("escrow_return", ("min_amount", ("supermajority", ("representatives_share", ("representative_max_share", ("quorum_update_period", ("quorum_update", ("quorum_max_change", ("min_quorum", "max_quorum"))))))))))))))
 
     MUTEZ_TRANSFERS_TYPE = sp.TList(sp.TRecord(
         # The amount of mutez to transfer
@@ -73,7 +75,7 @@ class DAOGovernance(sp.Contract):
         destination=sp.TAddress).layout(
             ("amount", "destination")))
 
-    TOKEN_TRANSFERS_TYPE = sp.TRecord(
+    FA2_TOKEN_TRANSFERS_TYPE = sp.TRecord(
         # The token contract address
         fa2=sp.TAddress,
         # The token id
@@ -95,7 +97,7 @@ class DAOGovernance(sp.Contract):
         # A proposal to transfer mutez from the DAO treasury to other accounts
         transfer_mutez=MUTEZ_TRANSFERS_TYPE,
         # A proposal to transfer a token from the DAO treasury to other accounts
-        transfer_token=TOKEN_TRANSFERS_TYPE,
+        transfer_token=FA2_TOKEN_TRANSFERS_TYPE,
         # A proposal to execute a lambda function
         lambda_function=LAMBDA_FUNCTION_TYPE)
 
@@ -183,48 +185,59 @@ class DAOGovernance(sp.Contract):
 
     # Basis for contract instance metadata
     CONTRACT_METADATA_BASE = {
-        # TODO: Add other fields, perhaps use a common header?
-        'errors': [{'error': {'string': 'DAO_NOT_MEMBER'},
-             'expansion': {'string': 'The caller is not considered a DAO member. Typically due to a 0 token balance.'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_NOT_ISSUER_NOR_GUARDIAN'},
-             'expansion': {'string': 'The caller is neither a guardian, nor a proposal issuer, one of which is required for this entry-point.'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_STATUS_NOT_OPEN_OR_APPROVED'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_STATUS_NOT_OPEN'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_OPEN_PROPOSAL'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_STATUS_NOT_APPROVED'},
-             'expansion': {'string': 'The operation can not be performed because the proposal has not been approved (yet).'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_WAITING_PROPOSAL'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_CLOSED_PROPOSAL'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_ALREADY_VOTED'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_NOT_DAO_OR_ADMIN'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_NOT_DAO_OR_GUARDIANS'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_NOT_DAO_OR_REPRESENTATIVES'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']},
-            {'error': {'string': 'DAO_INSUFICIENT_BALANCE'},
-             'expansion': {'string': 'ERROR_MISSING_EXPANSION_DATA'},
-             'languages': ['en']}]
-        }
-            
+        "name": "Teia DAO governance contract",
+        "description": "Teia DAO governance contract where DAO proposals are submitted, voted and executed",
+        "version": "1.0.0",
+        "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+        "homepage": "https://teia.art",
+        "source": {
+            "tools": ["SmartPy 0.16.0"],
+            "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoGovernance.py"
+        },
+        "license": {
+            "name": "MIT",
+            "details": "The MIT License"
+        },
+        "interfaces": ["TZIP-016"],
+        "error": [ {"error": {"string": "DAO_NOT_MEMBER"},
+                    "expansion": {"string": "The account that executed the entry point is not a DAO token holder"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_NOT_ISSUER_OR_GUARDIAN"},
+                    "expansion": {"string": "The account that executed the entry point is not the proposal issuer or the DAO guardians"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_STATUS_NOT_OPEN_OR_APPROVED"},
+                    "expansion": {"string": "The proposal status is not open or approved, so it cannot be cancelled anymore"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_STATUS_NOT_OPEN"},
+                    "expansion": {"string": "The proposal status is not open, so it is not possible to vote it anymore"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_OPEN_PROPOSAL"},
+                    "expansion": {"string": "The proposal status is still open, so it cannot be evaluated"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_STATUS_NOT_APPROVED"},
+                    "expansion": {"string": "The proposal status is not approved, so it cannot be executed"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_WAITING_PROPOSAL"},
+                    "expansion": {"string": "The proposal is still in the waiting period, so it cannot be executed"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_CLOSED_PROPOSAL"},
+                    "expansion": {"string": "The proposal voting period has passed and it is not possible to vote it anymore"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_ALREADY_VOTED"},
+                    "expansion": {"string": "The DAO member or representative has already voted the proposal"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_NOT_DAO_OR_ADMIN"},
+                    "expansion": {"string": "The account that executed the entry point is not the DAO or the DAO administrator"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_NOT_DAO_OR_GUARDIANS"},
+                    "expansion": {"string": "The account that executed the entry point is not the DAO or the DAO guardians"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_NOT_DAO_OR_REPRESENTATIVES"},
+                    "expansion": {"string": "The account that executed the entry point is not the DAO or the DAO representatives"},
+                    "languages": ["en"]},
+                   {"error": {"string": "DAO_INSUFICIENT_BALANCE"},
+                    "expansion": {"string": "The account that executed the entry point does not have enough DAO tokens to vote the proposal"},
+                    "languages": ["en"]}]}
 
     def __init__(self, metadata, administrator, treasury, token,
                  representatives, guardians, quorum, governance_parameters):
@@ -265,7 +278,6 @@ class DAOGovernance(sp.Contract):
             # The proposals counter
             counter=sp.TNat))
 
-
         # Initialize the contract storage
         self.init(
             metadata=metadata,
@@ -286,9 +298,23 @@ class DAOGovernance(sp.Contract):
         # Build the TZIP-016 contract metadata
         # (For producing metadata JSON and TZIP-16 linting)
         self.contract_metadata = dict(DAOGovernance.CONTRACT_METADATA_BASE)
-        self.contract_metadata.update({}) 
+        self.contract_metadata.update({})
 
         self.init_metadata("contract_metadata", self.contract_metadata)
+
+    @sp.private_lambda(with_storage=None, with_operations=False, wrap_call=True)
+    def check_is_dao_or_admin(self, admin):
+        """Checks that the address that called the entry point is the DAO itself
+        or the DAO administrator.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(admin, sp.TAddress)
+
+        # Check that the DAO or the DAO administrator executed the entry point
+        sp.verify((sp.sender == sp.self_address) | 
+                  (sp.sender == admin),
+                  message="DAO_NOT_DAO_OR_ADMIN")
 
     @sp.private_lambda(with_storage=None, with_operations=False, wrap_call=True)
     def check_is_dao_member(self, token):
@@ -300,7 +326,7 @@ class DAOGovernance(sp.Contract):
         params = sp.set_type_expr(
             sp.record(
                 owner=sp.sender,
-                token_id=0),
+                token_id=sp.nat(0)),
             sp.TRecord(
                 owner=sp.TAddress,
                 token_id=sp.TNat).layout(
@@ -375,8 +401,9 @@ class DAOGovernance(sp.Contract):
             token_votes=DAOGovernance.VOTES_SUMMARY_TYPE,
             representatives_votes=DAOGovernance.VOTES_SUMMARY_TYPE,
             quorum=sp.TNat,
-            representatives_share=sp.TNat).layout(
-                ("token_votes", ("representatives_votes", ("quorum", "representatives_share")))))
+            representatives_share=sp.TNat,
+            representative_max_share=sp.TNat).layout(
+                ("token_votes", ("representatives_votes", ("quorum", ("representatives_share", "representative_max_share"))))))
 
         # Add the token votes to the proposal total votes
         total_votes = sp.local("total_votes", sp.record(
@@ -388,8 +415,13 @@ class DAOGovernance(sp.Contract):
         representatives_votes_total = sp.compute(params.representatives_votes.total)
 
         with sp.if_(representatives_votes_total > 0):
+            # Calculate the representatives share
+            representatives_share = sp.min(
+                params.representatives_share,
+                representatives_votes_total * params.representative_max_share)
+
             # Calculate the representatives votes based on the proposal quorum
-            representatives_total = sp.compute((params.quorum * params.representatives_share) // 100)
+            representatives_total = sp.compute((params.quorum * representatives_share) // 100)
             representatives_positive = (representatives_total * params.representatives_votes.positive) // representatives_votes_total
             representatives_negative = (representatives_total * params.representatives_votes.negative) // representatives_votes_total
 
@@ -618,7 +650,7 @@ class DAOGovernance(sp.Contract):
         # issuer or the DAO guardians
         sp.verify((sp.sender == proposal.issuer) | 
                   (sp.sender == self.data.guardians),
-                  message="DAO_NOT_ISSUER_NOR_GUARDIAN")
+                  message="DAO_NOT_ISSUER_OR_GUARDIAN")
 
         # Check that the proposal status is set as open or approved
         sp.verify(proposal.status.is_variant("open") | 
@@ -634,7 +666,8 @@ class DAOGovernance(sp.Contract):
                 token_votes=proposal.token_votes,
                 representatives_votes=proposal.representatives_votes,
                 quorum=proposal.quorum,
-                representatives_share=gp.representatives_share))
+                representatives_share=gp.representatives_share,
+                representative_max_share=gp.representative_max_share))
 
             # Check which address should receive the DAO tokens
             receiver = sp.local("receiver", self.data.treasury)
@@ -682,7 +715,8 @@ class DAOGovernance(sp.Contract):
             token_votes=proposal.token_votes,
             representatives_votes=proposal.representatives_votes,
             quorum=proposal.quorum,
-            representatives_share=gp.representatives_share))
+            representatives_share=gp.representatives_share,
+            representative_max_share=gp.representative_max_share))
 
         # Check if there are some DAO tokens in escrow
         with sp.if_(gp.escrow_amount > 0):
@@ -712,18 +746,19 @@ class DAOGovernance(sp.Contract):
 
         self.data.proposals[proposal_id].status = new_status.value
 
-        # Check that the voting weight method didn't change
+        # To update the quorum parameter for future proposals, the current
+        # proposal should have passed the super-majority condition and the
+        # voting weight method should not have changed
         gp_index = sp.as_nat(self.data.gp_counter - 1)
         current_gp = sp.compute(self.data.governance_parameters[gp_index])
 
-        with sp.if_(gp.vote_method == current_gp.vote_method):
-            # To minimize the effect of spam proposals, quorum updates cannot be
-            # too often and can only happen for proposals that had a
-            # super-majority
+        with sp.if_(passed_supermajority & (gp.vote_method == current_gp.vote_method)):
+            # To minimize the effect of spam proposals, quorum updates should
+            # not happen too often
             min_quorum_update_date = self.data.last_quorum_update.add_days(
                 sp.to_int(current_gp.quorum_update_period))
 
-            with sp.if_((sp.now > min_quorum_update_date) & passed_supermajority):
+            with sp.if_(sp.now > min_quorum_update_date):
                 # Calculate the new quorum value
                 current_quorum_contribution = self.data.quorum * sp.as_nat(100 - current_gp.quorum_update)
                 proposal_contribution = total_votes.total * current_gp.quorum_update
@@ -790,7 +825,7 @@ class DAOGovernance(sp.Contract):
             with arg.match("transfer_token") as token_transfers:
                 # Get a handle to the DAO treasury transfer token entry point
                 transfer_token_handle = sp.contract(
-                    t=DAOGovernance.TOKEN_TRANSFERS_TYPE,
+                    t=DAOGovernance.FA2_TOKEN_TRANSFERS_TYPE,
                     address=self.data.treasury,
                     entry_point="transfer_fa2_token").open_some()
 
@@ -813,9 +848,7 @@ class DAOGovernance(sp.Contract):
         sp.set_type(new_administrator, sp.TAddress)
 
         # Check that the DAO or the DAO administrator executed the entry point
-        sp.verify((sp.sender == sp.self_address) | 
-                  (sp.sender == self.data.administrator),
-                  message="DAO_NOT_DAO_OR_ADMIN")
+        self.check_is_dao_or_admin(self.data.administrator)
 
         # Update the DAO administrator contract address
         self.data.administrator = new_administrator
@@ -829,12 +862,30 @@ class DAOGovernance(sp.Contract):
         sp.set_type(new_treasury, sp.TAddress)
 
         # Check that the DAO or the DAO administrator executed the entry point
-        sp.verify((sp.sender == sp.self_address) | 
-                  (sp.sender == self.data.administrator),
-                  message="DAO_NOT_DAO_OR_ADMIN")
+        self.check_is_dao_or_admin(self.data.administrator)
 
         # Update the DAO treasury contract address
         self.data.treasury = new_treasury
+
+    @sp.entry_point
+    def accept_treasury(self):
+        """Accepts the treasury contract administrator responsibilities.
+
+        """
+        # Check that the DAO or the DAO administrator executed the entry point
+        self.check_is_dao_or_admin(self.data.administrator)
+
+        # Get a handle to the DAO treasury accept administrator entry point
+        accept_administrator_handle = sp.contract(
+            t=sp.TUnit,
+            address=self.data.treasury,
+            entry_point="accept_administrator").open_some()
+
+        # Accept the administrator responsibilities
+        sp.transfer(
+            arg=sp.unit,
+            amount=sp.mutez(0),
+            destination=accept_administrator_handle)
 
     @sp.entry_point
     def set_representatives(self, new_representatives):
@@ -877,12 +928,11 @@ class DAOGovernance(sp.Contract):
         sp.set_type(new_quorum, sp.TNat)
 
         # Check that the DAO or the DAO administrator executed the entry point
-        sp.verify((sp.sender == sp.self_address) | 
-                  (sp.sender == self.data.administrator),
-                  message="DAO_NOT_DAO_OR_ADMIN")
+        self.check_is_dao_or_admin(self.data.administrator)
 
-        # Update the DAO quorum parameter
+        # Update the DAO quorum parameters
         self.data.quorum = new_quorum
+        self.data.last_quorum_update = sp.now
 
     @sp.entry_point
     def set_governance_parameters(self, new_governance_parameters):
@@ -894,9 +944,7 @@ class DAOGovernance(sp.Contract):
                     DAOGovernance.GOVERNANCE_PARAMETERS_TYPE)
 
         # Check that the DAO or the DAO administrator executed the entry point
-        sp.verify((sp.sender == sp.self_address) | 
-                  (sp.sender == self.data.administrator),
-                  message="DAO_NOT_DAO_OR_ADMIN")
+        self.check_is_dao_or_admin(self.data.administrator)
 
         # Update the governance parameters
         self.data.governance_parameters[self.data.gp_counter] = new_governance_parameters
@@ -906,7 +954,7 @@ class DAOGovernance(sp.Contract):
 
     @sp.entry_point(private=True)
     def get_integer_square_root(self, number):
-        """Returns the square root of the given number.
+        """Calculates the square root of the given number.
 
         Note that this is a private entrypoint only used for testing purposes.
 
@@ -917,32 +965,61 @@ class DAOGovernance(sp.Contract):
         # Store the result in the counter just for test purposes
         self.data.counter = self.integer_square_root(number)
 
+    @sp.entry_point(private=True)
+    def get_total_votes(self, params):
+        """Calculates the total votes from the given input parameters.
+
+        Note that this is a private entrypoint only used for testing purposes.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(params, sp.TRecord(
+            token_votes=DAOGovernance.VOTES_SUMMARY_TYPE,
+            representatives_votes=DAOGovernance.VOTES_SUMMARY_TYPE,
+            quorum=sp.TNat,
+            representatives_share=sp.TNat,
+            representative_max_share=sp.TNat).layout(
+                ("token_votes", ("representatives_votes", ("quorum", ("representatives_share", "representative_max_share"))))))
+
+        # Calculate the total votes
+        total_votes = self.calculate_total_votes(params)
+
+        # Store the result in the quorum, gp_counter and counter parameters just
+        # for test purposes
+        self.data.quorum = total_votes.total
+        self.data.gp_counter = total_votes.positive
+        self.data.counter = total_votes.negative
+
+
 # With smartpy-cli and teia_sc we can do some coverage and lint towards TZIP-16 compliance:
-if 'tzip16_error_inline' in environ.get('TEIA_SC_PARAMS','').split(':'):
+if "tzip16_error_inline" in environ.get("TEIA_SC_PARAMS", "").split(":"):
     from teia_sc.error_collection import ErrorCollection
     # Start collection of smart contract errors (for runtime tests)
     DAOGovernance.error_collection = ErrorCollection(DAOGovernance.__name__
             ).inject_into_smartpy(sp).add_base_metadata(DAOGovernance)
 
+token_decimals = 1000000
+
 sp.add_compilation_target("dao", DAOGovernance(
-    metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-    administrator=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekaa"),
-    treasury=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekbb"),
-    token=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekcc"),
-    representatives=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekdd"),
-    guardians=sp.address("KT1QmSmQ8Mj8JHNKKQmepFqQZy7kDWQ1ekee"),
-    quorum=8000,
+    metadata=sp.utils.metadata_of_url("ipfs://QmSc7n5jmSe4hJw6qFBdp8n3Aiv97yutMiZn5zhyfTuEMt"),
+    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
+    treasury=sp.address("KT1DrU2jEyFjYxku4fFmk2mBt7XAuD7Y1x2N"),
+    token=sp.address("KT1Bdh3NcpSnTy9kPGQLzBr9u51KHfPYqCnN"),
+    representatives=sp.address("KT1949LMECi1oRejnJP7Yphzsyhj9ADaX7Wu"),
+    guardians=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
+    quorum=8000 * token_decimals,
     governance_parameters=sp.record(
         vote_method=sp.variant("linear", sp.unit),
-        vote_period=5,
-        wait_period=2,
-        escrow_amount=100,
+        vote_period=2,
+        wait_period=1,
+        escrow_amount=10 * token_decimals,
         escrow_return=30,
-        min_amount=1,
+        min_amount=1 * token_decimals,
         supermajority=70,
         representatives_share=30,
+        representative_max_share=3,
         quorum_update_period=10,
         quorum_update=20,
         quorum_max_change=20,
-        min_quorum=1000,
-        max_quorum=100000)))
+        min_quorum=1000 * token_decimals,
+        max_quorum=100000 * token_decimals)))

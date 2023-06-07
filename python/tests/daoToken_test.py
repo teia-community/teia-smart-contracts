@@ -901,6 +901,9 @@ def test_transfer_and_accept_administrator():
     # Check the original administrator
     scenario.verify(fa2.data.administrator == admin.address)
 
+    # Check that is not possible to accept the administrator position if it's not set
+    fa2.accept_administrator().run(valid=False, sender=admin, exception="FA2_NO_NEW_ADMIN")
+
     # Check that only the admin can transfer the administrator
     new_administrator = user1.address
     fa2.transfer_administrator(new_administrator).run(valid=False, sender=user1, exception="FA2_NOT_ADMIN")

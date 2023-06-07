@@ -44,7 +44,7 @@ class DAOTreasury(sp.Contract):
         # The number of token editions
         amount=sp.TNat).layout(("to_", ("token_id", "amount")))
 
-    def __init__(self, metadata, dao):
+    def __init__(self, metadata, administrator):
         """Initializes the contract.
 
         """
@@ -52,13 +52,16 @@ class DAOTreasury(sp.Contract):
         self.init_type(sp.TRecord(
             # The contract metadata
             metadata=sp.TBigMap(sp.TString, sp.TBytes),
-            # The DAO governance contract address
-            dao=sp.TAddress))
+            # The contract administrator
+            administrator=sp.TAddress,
+            # The proposed new administrator address
+            proposed_administrator=sp.TOption(sp.TAddress)))
 
         # Initialize the contract storage
         self.init(
             metadata=metadata,
-            dao=dao)
+            administrator=administrator,
+            proposed_administrator=sp.none)
 
         # Fill the contract metadata
         self.contract_metadata = {
@@ -76,17 +79,24 @@ class DAOTreasury(sp.Contract):
                 "details": "The MIT License"
             },
             "interfaces": ["TZIP-016"],
-            "errors": [ {"error": {"string": "TREASURY_NOT_DAO"},
-                         "expansion": {"string": "The account that executed the entry point is not the DAO governance contract"},
+            "errors": [ {"error": {"string": "TREASURY_NOT_ADMIN"},
+                         "expansion": {"string": "The account that executed the entry point is not the contract administrator"},
+                         "languages": ["en"]},
+                        {"error": {"string": "TREASURY_NO_NEW_ADMIN"},
+                         "expansion": {"string": "The new administrator has not been proposed"},
+                         "languages": ["en"]},
+                        {"error": {"string": "TREASURY_NOT_PROPOSED_ADMIN"},
+                         "expansion": {"string": "The operation can only be executed by the proposed administrator"},
                          "languages": ["en"]}]}
         self.init_metadata("contract_metadata", self.contract_metadata)
 
-    def check_is_dao(self):
-        """Checks that the address that called the entry point is the DAO
-        governance contract.
+    def check_is_administrator(self):
+        """Checks that the address that called the entry point is the contract
+        administrator.
 
         """
-        sp.verify(sp.sender == self.data.dao, message="TREASURY_NOT_DAO")
+        sp.verify(sp.sender == self.data.administrator,
+                  message="TREASURY_NOT_ADMIN")
 
     @sp.entry_point
     def default(self, unit):
@@ -108,8 +118,8 @@ class DAOTreasury(sp.Contract):
         # Define the input parameter data type
         sp.set_type(mutez_transfers, DAOTreasury.MUTEZ_TRANSFERS_TYPE)
 
-        # Check that the DAO contract executed the entry point
-        self.check_is_dao()
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
 
         # Transfer the mutez to the list of addresses
         with sp.for_("mutez_transfer", mutez_transfers) as mutez_transfer:
@@ -123,8 +133,8 @@ class DAOTreasury(sp.Contract):
         # Define the input parameter data type
         sp.set_type(token_transfers, DAOTreasury.FA2_TOKEN_TRANSFERS_TYPE)
 
-        # Check that the DAO contract executed the entry point
-        self.check_is_dao()
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
 
         # Build the FA2 transactions list
         txs = sp.local("txs", sp.list(t=DAOTreasury.FA2_TX_TYPE))
@@ -159,8 +169,8 @@ class DAOTreasury(sp.Contract):
         # Define the input parameter data type
         sp.set_type(token_transfers, DAOTreasury.FA12_TOKEN_TRANSFERS_TYPE)
 
-        # Check that the DAO contract executed the entry point
-        self.check_is_dao()
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
 
         # Get a handle to the token transfer entry point
         token_transfer_handle = sp.contract(
@@ -182,18 +192,34 @@ class DAOTreasury(sp.Contract):
                 destination=token_transfer_handle)
 
     @sp.entry_point
-    def set_dao(self, new_dao):
-        """Updates the DAO contract address.
+    def transfer_administrator(self, proposed_administrator):
+        """Proposes to transfer the contract administrator to another address.
 
         """
         # Define the input parameter data type
-        sp.set_type(new_dao, sp.TAddress)
+        sp.set_type(proposed_administrator, sp.TAddress)
 
-        # Check that the DAO contract executed the entry point
-        self.check_is_dao()
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
 
-        # Update the DAO contract address
-        self.data.dao = new_dao
+        # Set the new proposed administrator address
+        self.data.proposed_administrator = sp.some(proposed_administrator)
+
+    @sp.entry_point
+    def accept_administrator(self):
+        """The proposed administrator accepts the contract administrator
+        responsibilities.
+
+        """
+        # Check that the proposed administrator executed the entry point
+        sp.verify(sp.sender == self.data.proposed_administrator.open_some(
+            "TREASURY_NO_NEW_ADMIN"), message="TREASURY_NOT_PROPOSED_ADMIN")
+
+        # Set the new administrator address
+        self.data.administrator = sp.sender
+
+        # Reset the proposed administrator value
+        self.data.proposed_administrator = sp.none
 
     @sp.entry_point
     def set_delegate(self, new_baker):
@@ -203,13 +229,13 @@ class DAOTreasury(sp.Contract):
         # Define the input parameter data type
         sp.set_type(new_baker, sp.TOption(sp.TKeyHash))
 
-        # Check that the DAO contract executed the entry point
-        self.check_is_dao()
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
 
         # Update the baker address
         sp.set_delegate(new_baker)
 
 
 sp.add_compilation_target("daoTreasury", DAOTreasury(
-    metadata=sp.utils.metadata_of_url("ipfs://QmYQZ7WUrVGQjfsGQR2DmkJrw3jPhVb1SLLG4GW8Xfww79"),
-    dao=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN")))
+    metadata=sp.utils.metadata_of_url("ipfs://QmewNgfyryssmkFHnr46vPDXeA8JiDMyfViDhNGSb8Voe4"),
+    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN")))

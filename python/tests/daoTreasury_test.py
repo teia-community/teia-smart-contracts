@@ -4,7 +4,7 @@
 
 import smartpy as sp
 
-# Import the DAO treasury and fa2 contract modules
+# Import the DAO treasury and token contract modules
 daoTreasuryModule = sp.io.import_script_from_url("file:contracts/daoTreasury.py")
 fa12Module = sp.io.import_script_from_url("file:contracts/fa12.py")
 fa2Module = sp.io.import_script_from_url("file:hen-contracts/fa2.py")
@@ -41,20 +41,20 @@ def get_test_environment():
     scenario = sp.test_scenario()
 
     # Create the test accounts
-    dao = sp.test_account("dao")
+    admin = sp.test_account("admin")
     user = sp.test_account("user")
 
     # Initialize the DAO treasury contract
     treasury = daoTreasuryModule.DAOTreasury(
         metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-        dao=dao.address)
+        administrator=admin.address)
     treasury.set_initial_balance(sp.tez(10))
     scenario += treasury
 
     # Save all the variables in a test environment dictionary
     testEnvironment = {
         "scenario": scenario,
-        "dao": dao,
+        "admin": admin,
         "user": user,
         "treasury": treasury}
 
@@ -66,12 +66,12 @@ def test_default_entripoint():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    dao = testEnvironment["dao"]
+    admin = testEnvironment["admin"]
     user = testEnvironment["user"]
     treasury = testEnvironment["treasury"]
 
     # Check that any user can send tez to the contract
-    treasury.default(sp.unit).run(sender=dao, amount=sp.tez(1))
+    treasury.default(sp.unit).run(sender=admin, amount=sp.tez(1))
     treasury.default(sp.unit).run(sender=user, amount=sp.tez(3))
 
     # Check that the tez are now part of the contract balance
@@ -83,7 +83,7 @@ def test_transfer_mutez():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    dao = testEnvironment["dao"]
+    admin = testEnvironment["admin"]
     user = testEnvironment["user"]
     treasury = testEnvironment["treasury"]
 
@@ -94,13 +94,13 @@ def test_transfer_mutez():
     scenario += recipient1
     scenario += recipient2
 
-    # Check that only the DAO contract can transfer tez
+    # Check that only the contract administrator can transfer tez
     mutez_transfers = sp.list([
         sp.record(amount=sp.tez(3), destination=recipient1.address),
         sp.record(amount=sp.tez(2), destination=recipient2.address)])
     treasury.transfer_mutez(mutez_transfers).run(
-        valid=False, sender=user, exception="TREASURY_NOT_DAO")
-    treasury.transfer_mutez(mutez_transfers).run(sender=dao)
+        valid=False, sender=user, exception="TREASURY_NOT_ADMIN")
+    treasury.transfer_mutez(mutez_transfers).run(sender=admin)
 
     # Check that the contract balance is correct
     scenario.verify(treasury.balance == sp.tez(10 - 3 - 2))
@@ -115,7 +115,7 @@ def test_transfer_fa2_token():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    dao = testEnvironment["dao"]
+    admin = testEnvironment["admin"]
     user = testEnvironment["user"]
     treasury = testEnvironment["treasury"]
 
@@ -146,7 +146,7 @@ def test_transfer_fa2_token():
     scenario.verify(fa2.data.ledger[(user.address, 0)].balance == 100 - 20)
     scenario.verify(fa2.data.ledger[(treasury.address, 0)].balance == 20)
 
-    # Check that only the DAO contract can transfer the token
+    # Check that only the contract administrator can transfer the token
     user2 = sp.test_account("user2")
     user3 = sp.test_account("user3")
     token_transfers = sp.record(
@@ -156,8 +156,8 @@ def test_transfer_fa2_token():
             sp.record(amount=sp.nat(5), destination=user2.address),
             sp.record(amount=sp.nat(1), destination=user3.address)]))
     treasury.transfer_fa2_token(token_transfers).run(
-        valid=False, sender=user, exception="TREASURY_NOT_DAO")
-    treasury.transfer_fa2_token(token_transfers).run(sender=dao)
+        valid=False, sender=user, exception="TREASURY_NOT_ADMIN")
+    treasury.transfer_fa2_token(token_transfers).run(sender=admin)
 
     # Check that the token ledger information is correct
     scenario.verify(fa2.data.ledger[(user.address, 0)].balance == 100 - 20)
@@ -171,7 +171,7 @@ def test_transfer_fa12_token():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    dao = testEnvironment["dao"]
+    admin = testEnvironment["admin"]
     user = testEnvironment["user"]
     treasury = testEnvironment["treasury"]
 
@@ -200,7 +200,7 @@ def test_transfer_fa12_token():
     scenario.verify(fa12.data.balances[user.address].balance == 100 - 20)
     scenario.verify(fa12.data.balances[treasury.address].balance == 20)
 
-    # Check that only the DAO contract can transfer the token
+    # Check that only the contract administrator can transfer the token
     user2 = sp.test_account("user2")
     user3 = sp.test_account("user3")
     token_transfers = sp.record(
@@ -209,8 +209,8 @@ def test_transfer_fa12_token():
             sp.record(amount=sp.nat(5), destination=user2.address),
             sp.record(amount=sp.nat(1), destination=user3.address)]))
     treasury.transfer_fa12_token(token_transfers).run(
-        valid=False, sender=user, exception="TREASURY_NOT_DAO")
-    treasury.transfer_fa12_token(token_transfers).run(sender=dao)
+        valid=False, sender=user, exception="TREASURY_NOT_ADMIN")
+    treasury.transfer_fa12_token(token_transfers).run(sender=admin)
 
     # Check that the token ledger information is correct
     scenario.verify(fa12.data.balances[user.address].balance == 100 - 20)
@@ -219,25 +219,48 @@ def test_transfer_fa12_token():
     scenario.verify(fa12.data.balances[user3.address].balance == 1)
 
 
-@sp.add_test(name="Test set dao")
-def test_set_dao():
+@sp.add_test(name="Test transfer and accept administrator")
+def test_transfer_and_accept_administrator():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    dao = testEnvironment["dao"]
+    admin = testEnvironment["admin"]
     user = testEnvironment["user"]
     treasury = testEnvironment["treasury"]
 
-    # Check the original DAO contract address
-    scenario.verify(treasury.data.dao == dao.address)
+    # Check the original administrator
+    scenario.verify(treasury.data.administrator == admin.address)
 
-    # Check that only the DAO contract can set the new DAO
-    treasury.set_dao(user.address).run(
-        valid=False, sender=user, exception="TREASURY_NOT_DAO")
-    treasury.set_dao(user.address).run(sender=dao)
+    # Check that is not possible to accept the administrator position if it's not set
+    treasury.accept_administrator().run(
+        valid=False, sender=admin, exception="TREASURY_NO_NEW_ADMIN")
 
-    # Check that the contract information have been updated
-    scenario.verify(treasury.data.dao == user.address)
+    # Check that only the admin can transfer the administrator
+    new_administrator = user.address
+    treasury.transfer_administrator(new_administrator).run(
+        valid=False, sender=user, exception="TREASURY_NOT_ADMIN")
+    treasury.transfer_administrator(new_administrator).run(sender=admin)
+
+    # Check that the proposed administrator is updated
+    scenario.verify(treasury.data.proposed_administrator.open_some() == new_administrator)
+
+    # Check that only the proposed administrator can accept the administrator position
+    treasury.accept_administrator().run(
+        valid=False, sender=admin, exception="TREASURY_NOT_PROPOSED_ADMIN")
+    treasury.accept_administrator().run(sender=user)
+
+    # Check that the administrator is updated
+    scenario.verify(treasury.data.administrator == new_administrator)
+    scenario.verify(~treasury.data.proposed_administrator.is_some())
+
+    # Check that only the new administrator can propose a new administrator
+    new_administrator = admin.address
+    treasury.transfer_administrator(new_administrator).run(
+        valid=False, sender=admin, exception="TREASURY_NOT_ADMIN")
+    treasury.transfer_administrator(new_administrator).run(sender=user)
+
+    # Check that the proposed administrator is updated
+    scenario.verify(treasury.data.proposed_administrator.open_some() == new_administrator)
 
 
 @sp.add_test(name="Test set delegate")
@@ -245,7 +268,7 @@ def test_set_delegate():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    dao = testEnvironment["dao"]
+    admin = testEnvironment["admin"]
     user = testEnvironment["user"]
     treasury = testEnvironment["treasury"]
 
@@ -253,5 +276,5 @@ def test_set_delegate():
     voting_powers = {user.public_key_hash: 0}
     delegate = sp.some(user.public_key_hash)
     treasury.set_delegate(delegate).run(
-        valid=False, sender=user, voting_powers=voting_powers, exception="TREASURY_NOT_DAO")
-    treasury.set_delegate(delegate).run(sender=dao, voting_powers=voting_powers)
+        valid=False, sender=user, voting_powers=voting_powers, exception="TREASURY_NOT_ADMIN")
+    treasury.set_delegate(delegate).run(sender=admin, voting_powers=voting_powers)

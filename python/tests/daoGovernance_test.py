@@ -64,7 +64,7 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
     # Initialize the DAO treasury contract
     treasury = daoTreasuryModule.DAOTreasury(
         metadata=sp.utils.metadata_of_url("ipfs://ccc"),
-        dao=admin.address)
+        administrator=admin.address)
     treasury.set_initial_balance(sp.tez(10))
     scenario += treasury
 
@@ -106,6 +106,7 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
             min_amount=1,
             supermajority=60,
             representatives_share=30,
+            representative_max_share=10,
             quorum_update_period=3,
             quorum_update=20,
             quorum_max_change=20,
@@ -114,7 +115,10 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
     scenario += dao
 
     # Update the treasury DAO contract address
-    treasury.set_dao(dao.address).run(sender=admin)
+    treasury.transfer_administrator(dao.address).run(sender=admin)
+
+    # The DAO accepts the treasury
+    dao.accept_treasury().run(sender=admin)
 
     # Add the DAO treasury and DAO governance contracts as maximum share exceptions
     token.add_max_share_exception(treasury.address).run(sender=admin)
@@ -339,7 +343,7 @@ def test_text_proposal():
 
     # Check that the contract information has been updated
     scenario.verify(dao.data.proposals[0].status.is_variant("approved"))
-    scenario.verify(dao.data.quorum == int(800 * 0.8 + (100 + 300 + 400 + 5 + 800 * 0.3) * 0.2))
+    scenario.verify(dao.data.quorum == int(800 * 0.8 + (100 + 300 + 400 + 5 + 800 * 0.2) * 0.2))
     scenario.verify(dao.data.last_quorum_update == sp.timestamp(101).add_days(5))
 
     # Check that the tokens in escrow have been transferred back to user 4
@@ -478,7 +482,7 @@ def test_transfer_token_proposal():
             distribution=[
                 sp.record(amount=sp.nat(10), destination=user1.address),
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
-        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+        t=daoGovernanceModule.DAOGovernance.FA2_TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
     dao.create_proposal(
         title=proposal_title,
@@ -641,6 +645,7 @@ def test_lambda_function_proposal():
                 min_amount=6,
                 supermajority=60,
                 representatives_share=30,
+                representative_max_share=30,
                 quorum_update_period=3,
                 quorum_update=20,
                 quorum_max_change=20,
@@ -810,7 +815,7 @@ def test_cancel_proposal():
             distribution=[
                 sp.record(amount=sp.nat(10), destination=user1.address),
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
-        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+        t=daoGovernanceModule.DAOGovernance.FA2_TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
     dao.create_proposal(
         title=proposal_title,
@@ -836,7 +841,7 @@ def test_cancel_proposal():
 
     # Check that only the proposal issuer can cancel the proposal
     dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
-        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER_NOR_GUARDIAN")
+        valid=False, sender=user1, now=sp.timestamp(500), level=50, exception="DAO_NOT_ISSUER_OR_GUARDIAN")
 
     # Cancel the proposal
     dao.cancel_proposal(proposal_id=0, return_escrow=True).run(
@@ -946,7 +951,7 @@ def test_supermajority_failed_proposal():
             distribution=[
                 sp.record(amount=sp.nat(10), destination=user1.address),
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
-        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+        t=daoGovernanceModule.DAOGovernance.FA2_TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
     dao.create_proposal(
         title=proposal_title,
@@ -1014,7 +1019,7 @@ def test_quorum_failed_proposal():
             distribution=[
                 sp.record(amount=sp.nat(10), destination=user1.address),
                 sp.record(amount=sp.nat(20), destination=external_user.address)]),
-        t=daoGovernanceModule.DAOGovernance.TOKEN_TRANSFERS_TYPE)
+        t=daoGovernanceModule.DAOGovernance.FA2_TOKEN_TRANSFERS_TYPE)
     proposal_kind = sp.variant("transfer_token", token_transfers)
     dao.create_proposal(
         title=proposal_title,
@@ -1163,10 +1168,12 @@ def test_admin():
     scenario.verify(dao.data.treasury == new_treasury.address)
 
     # Update the DAO quorum
-    dao.set_quorum(2).run(sender=admin)
+    dao.set_quorum(2).run(
+        sender=admin, now=sp.timestamp_from_utc(2023, 1, 1, 0, 0, 0))
 
-    # Check that the quorum has been updated
+    # Check that the quorum parameters have been updated
     scenario.verify(dao.data.quorum == 2)
+    scenario.verify(dao.data.last_quorum_update == sp.timestamp_from_utc(2023, 1, 1, 0, 0, 0))
 
 
 @sp.add_test(name="Test integer square root")
@@ -1205,6 +1212,54 @@ def test_integer_square_root():
 
     dao.get_integer_square_root(12345 * 12345 + 1)
     scenario.verify(dao.data.counter == 12345)
+
+
+@sp.add_test(name="Test calculate total votes")
+def test_integer_square_root():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    dao = testEnvironment["dao"]
+
+    dao.get_total_votes(
+        token_votes=sp.record(
+            positive=10,
+            negative=10,
+            abstain=10,
+            total=30,
+            participation=3),
+        representatives_votes=sp.record(
+            positive=3,
+            negative=2,
+            abstain=1,
+            total=6,
+            participation=6),
+        quorum=1000,
+        representatives_share=30,
+        representative_max_share=3)
+    scenario.verify(dao.data.quorum == 30 + (6 * 3 * 1000) // 100)
+    scenario.verify(dao.data.gp_counter == 10 + (3 * 3 * 1000) // 100)
+    scenario.verify(dao.data.counter == 10 + (2 * 3 * 1000) // 100)
+
+    dao.get_total_votes(
+        token_votes=sp.record(
+            positive=10,
+            negative=10,
+            abstain=10,
+            total=30,
+            participation=3),
+        representatives_votes=sp.record(
+            positive=30,
+            negative=19,
+            abstain=9,
+            total=58,
+            participation=58),
+        quorum=1000,
+        representatives_share=30,
+        representative_max_share=3)
+    scenario.verify(dao.data.quorum == 30 + ((58 * 30 * 1000) // 58) // 100)
+    scenario.verify(dao.data.gp_counter == 10 + ((30 * 30 * 1000) // 58) // 100)
+    scenario.verify(dao.data.counter == 10 + ((19 * 30 * 1000) // 58) // 100)
 
 
 @sp.add_test(name="Test quadratic voting")
@@ -1275,8 +1330,9 @@ def test_quadratic_voting():
     scenario.verify(dao.data.token_votes[(0, user5.address)].weight == 100 * int(pow(5 * decimals / 10000, 0.5)))
 
 
-if ('tzip16_error_lint' in environ.get('TEIA_SC_PARAMS','').split(':') and
+if ('tzip16_error_lint' in environ.get('TEIA_SC_PARAMS', '').split(':') and
     type(daoGovernanceModule.DAOGovernance.error_collection).__name__ == 'ErrorCollection'):
+
     @sp.add_test(name="Lint FAILWITH messages")
     def test_error_message_rules():
         scenario = sp.test_scenario()
