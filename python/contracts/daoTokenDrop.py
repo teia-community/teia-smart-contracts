@@ -219,6 +219,20 @@ class DAOTokenDrop(sp.Contract):
         self.dao_transfer(self.data.treasury, amount)
 
     @sp.entry_point
+    def update_token(self, new_token):
+        """Updates the DAO token address.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(new_token, sp.TAddress)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Update the DAO token address
+        self.data.token = new_token
+
+    @sp.entry_point
     def update_treasury(self, new_treasury):
         """Updates the DAO treasury address that will receive the unclaimed
         tokens after the claim period.

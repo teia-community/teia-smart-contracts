@@ -49,6 +49,7 @@ def get_test_environment():
 
     # Create the test accounts
     admin = sp.test_account("admin")
+    initial_owner = sp.test_account("initial_owner")
     user1 = sp.test_account("user1")
     user2 = sp.test_account("user2")
     user3 = sp.test_account("user3")
@@ -58,6 +59,7 @@ def get_test_environment():
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"),
         token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
+        initial_owner=initial_owner.address,
         supply=1000000000000,
         max_share=50000000000)
     scenario += fa2
@@ -66,6 +68,7 @@ def get_test_environment():
     testEnvironment = {
         "scenario": scenario,
         "admin": admin,
+        "initial_owner": initial_owner,
         "user1": user1,
         "user2": user2,
         "user3": user3,
@@ -80,20 +83,24 @@ def test_transfer():
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
     fa2 = testEnvironment["fa2"]
 
     # Check that the initial contract information is correct
-    scenario.verify(fa2.data.ledger[admin.address] == 1000000000000)
+    scenario.verify(fa2.data.ledger[initial_owner.address] == 1000000000000)
+    scenario.verify(~fa2.data.ledger.contains(admin.address))
     scenario.verify(~fa2.data.ledger.contains(user1.address))
     scenario.verify(~fa2.data.ledger.contains(user2.address))
     scenario.verify(~fa2.data.ledger.contains(user3.address))
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000)
+    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 0)
+    scenario.verify(~fa2.data.n_checkpoints.contains(initial_owner.address))
     scenario.verify(~fa2.data.n_checkpoints.contains(admin.address))
     scenario.verify(~fa2.data.n_checkpoints.contains(user1.address))
     scenario.verify(~fa2.data.n_checkpoints.contains(user2.address))
@@ -101,28 +108,32 @@ def test_transfer():
     scenario.verify(fa2.data.supply == 1000000000000)
     scenario.verify(fa2.total_supply(0) == 1000000000000)
     scenario.verify(fa2.data.max_share == 50000000000)
+    scenario.verify(fa2.data.max_share_exceptions.contains(initial_owner.address))
+    scenario.verify(sp.len(fa2.data.max_share_exceptions) == 1)
     scenario.verify(fa2.token_metadata(0).token_info[""] == sp.utils.bytes_of_string("ipfs://bbb"))
     scenario.verify(sp.len(fa2.all_tokens()) == 1)
 
-    # Transfer some editions from the admin to the first user
+    # Transfer some editions from the initial owner to the first user
     editions = 15
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=editions)])
-        ]).run(sender=admin, level=0)
+        ]).run(sender=initial_owner, level=0)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - editions)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - editions)
+    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == editions)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 0)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
+    scenario.verify(~fa2.data.n_checkpoints.contains(admin.address))
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 1)
     scenario.verify(~fa2.data.n_checkpoints.contains(user2.address))
     scenario.verify(~fa2.data.n_checkpoints.contains(user3.address))
-    scenario.verify(fa2.data.checkpoints[(admin.address, 0)].level == 0)
-    scenario.verify(fa2.data.checkpoints[(admin.address, 0)].balance == 1000000000000 - editions)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 0)].level == 0)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 0)].balance == 1000000000000 - editions)
     scenario.verify(fa2.data.checkpoints[(user1.address, 0)].level == 0)
     scenario.verify(fa2.data.checkpoints[(user1.address, 0)].balance == editions)
     scenario.verify(fa2.total_supply(0) == 1000000000000)
@@ -149,11 +160,13 @@ def test_transfer():
         ]).run(sender=user1, level=20)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - editions)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - editions)
+    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == editions - 3)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 0)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
+    scenario.verify(~fa2.data.n_checkpoints.contains(admin.address))
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 2)
     scenario.verify(~fa2.data.n_checkpoints.contains(user2.address))
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 1)
@@ -185,11 +198,11 @@ def test_transfer():
         ]).run(sender=user3, level=30)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - editions)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - editions)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == editions - 3)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 1)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3 - 1)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 2)
@@ -213,11 +226,11 @@ def test_transfer():
         ]).run(sender=user2, level=40)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - editions)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - editions)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == editions - 3 - 5)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 1)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3 - 1 + 5)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 3)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 3)
@@ -230,22 +243,22 @@ def test_transfer():
     # Transfer a large amount of tokens to the users
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share / 2),
                  sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share / 2)])
-        ]).run(sender=admin, level=50)
+        ]).run(sender=initial_owner, level=50)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - editions - 50000000000)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - editions - 50000000000)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == editions - 3 - 5 + fa2.data.max_share / 2)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 1 + fa2.data.max_share / 2)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3 - 1 + 5)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 2)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 4)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 3)
-    scenario.verify(fa2.data.checkpoints[(admin.address, 1)].level == 50)
-    scenario.verify(fa2.data.checkpoints[(admin.address, 1)].balance == 1000000000000 - editions - 50000000000)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 1)].level == 50)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 1)].balance == 1000000000000 - editions - 50000000000)
     scenario.verify(fa2.data.checkpoints[(user1.address, 3)].level == 50)
     scenario.verify(fa2.data.checkpoints[(user1.address, 3)].balance == editions - 3 - 5 + fa2.data.max_share / 2)
     scenario.verify(fa2.data.checkpoints[(user2.address, 1)].level == 50)
@@ -266,30 +279,31 @@ def test_complex_transfer():
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
     fa2 = testEnvironment["fa2"]
 
-    # Transfer some editions from the admin to two users
+    # Transfer some editions from the initial owner to two users
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=10),
                  sp.record(to_=user2.address, token_id=0, amount=20)])
-        ]).run(sender=admin, level=10)
+        ]).run(sender=initial_owner, level=10)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == 10)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 20)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 0)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 1)
     scenario.verify(~fa2.data.n_checkpoints.contains(user3.address))
-    scenario.verify(fa2.data.checkpoints[(admin.address, 0)].level == 10)
-    scenario.verify(fa2.data.checkpoints[(admin.address, 0)].balance == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 0)].level == 10)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 0)].balance == 1000000000000 - 10 - 20)
     scenario.verify(fa2.data.checkpoints[(user1.address, 0)].level == 10)
     scenario.verify(fa2.data.checkpoints[(user1.address, 0)].balance == 10)
     scenario.verify(fa2.data.checkpoints[(user2.address, 0)].level == 10)
@@ -316,11 +330,11 @@ def test_complex_transfer():
         ]).run(sender=user1, level=20)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == 10 - 2 - 3)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 20 + 2)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 1)
@@ -352,11 +366,11 @@ def test_complex_transfer():
         ]).run(sender=user2, level=30)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == 10 - 2 - 3)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 20 + 2)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 2)
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 1)
@@ -380,11 +394,11 @@ def test_complex_transfer():
         ]).run(sender=user2, level=40)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == 10 - 2 - 3 - 2)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == 20 + 2 - 1)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 3 + 2 + 1)
-    scenario.verify(fa2.data.n_checkpoints[admin.address] == 1)
+    scenario.verify(fa2.data.n_checkpoints[initial_owner.address] == 1)
     scenario.verify(fa2.data.n_checkpoints[user1.address] == 3)
     scenario.verify(fa2.data.n_checkpoints[user2.address] == 3)
     scenario.verify(fa2.data.n_checkpoints[user3.address] == 2)
@@ -402,22 +416,23 @@ def test_prior_balance():
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
     fa2 = testEnvironment["fa2"]
 
-    # Transfer some editions from the admin to two users
+    # Transfer some editions from the initial owner to two users
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=10),
                  sp.record(to_=user2.address, token_id=0, amount=20)])
-        ]).run(sender=admin, level=10)
+        ]).run(sender=initial_owner, level=10)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.data.checkpoints[(admin.address, 0)].level == 10)
-    scenario.verify(fa2.data.checkpoints[(admin.address, 0)].balance == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 0)].level == 10)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 0)].balance == 1000000000000 - 10 - 20)
     scenario.verify(fa2.data.checkpoints[(user1.address, 0)].level == 10)
     scenario.verify(fa2.data.checkpoints[(user1.address, 0)].balance == 10)
     scenario.verify(fa2.data.checkpoints[(user2.address, 0)].level == 10)
@@ -439,9 +454,9 @@ def test_prior_balance():
     scenario.verify(fa2.data.checkpoints[(user2.address, 1)].balance == 20 + 2)
     scenario.verify(fa2.data.checkpoints[(user3.address, 0)].level == 20)
     scenario.verify(fa2.data.checkpoints[(user3.address, 0)].balance == 3)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=9)) == 0)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=9)) == 0)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=9)) == 0)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=10)) == 10)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=11)) == 10)
@@ -467,11 +482,11 @@ def test_prior_balance():
     # Check that the contract information has been updated
     scenario.verify(fa2.data.checkpoints[(user2.address, 1)].level == 20)
     scenario.verify(fa2.data.checkpoints[(user2.address, 1)].balance == 20 + 2)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=9)) == 0)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=9)) == 0)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=9)) == 0)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=10)) == 10)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=11)) == 10)
@@ -513,13 +528,13 @@ def test_prior_balance():
     scenario.verify(fa2.data.checkpoints[(user2.address, 2)].balance == 20 + 2 - 1)
     scenario.verify(fa2.data.checkpoints[(user3.address, 1)].level == 40)
     scenario.verify(fa2.data.checkpoints[(user3.address, 1)].balance == 3 + 2 + 1)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=9)) == 0)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=30)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=35)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=9)) == 0)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=30)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=35)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=9)) == 0)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=10)) == 10)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=11)) == 10)
@@ -544,27 +559,27 @@ def test_prior_balance():
     scenario.verify(sp.is_failing(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=40))))
     scenario.verify(sp.is_failing(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=50))))
 
-    # Transfer some extra editions from the admin to the first user
+    # Transfer some extra editions from the initial owner to the first user
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=100)])
-        ]).run(sender=admin, level=50)
+        ]).run(sender=initial_owner, level=50)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.data.checkpoints[(admin.address, 1)].level == 50)
-    scenario.verify(fa2.data.checkpoints[(admin.address, 1)].balance == 1000000000000 - 10 - 20 - 100)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 1)].level == 50)
+    scenario.verify(fa2.data.checkpoints[(initial_owner.address, 1)].balance == 1000000000000 - 10 - 20 - 100)
     scenario.verify(fa2.data.checkpoints[(user1.address, 3)].level == 50)
     scenario.verify(fa2.data.checkpoints[(user1.address, 3)].balance == 10 - 2 - 3 - 2 + 100)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=9)) == 0)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=30)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=35)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=40)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=45)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=9)) == 0)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=30)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=35)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=40)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=45)) == 1000000000000 - 10 - 20)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=9)) == 0)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=10)) == 10)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=11)) == 10)
@@ -604,17 +619,17 @@ def test_prior_balance():
     scenario.verify(fa2.data.checkpoints[(user1.address, 4)].balance == 10 - 2 - 3 - 2 + 100 + 5)
     scenario.verify(fa2.data.checkpoints[(user2.address, 3)].level == 60)
     scenario.verify(fa2.data.checkpoints[(user2.address, 3)].balance == 20 + 2 - 1 - 5)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=9)) == 0)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=30)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=35)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=40)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=45)) == 1000000000000 - 10 - 20)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=50)) == 1000000000000 - 10 - 20 - 100)
-    scenario.verify(fa2.get_prior_balance(sp.record(owner=admin.address, max_checkpoints=sp.none, level=59)) == 1000000000000 - 10 - 20 - 100)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=9)) == 0)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=10)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=11)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=20)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=25)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=30)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=35)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=40)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=45)) == 1000000000000 - 10 - 20)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=50)) == 1000000000000 - 10 - 20 - 100)
+    scenario.verify(fa2.get_prior_balance(sp.record(owner=initial_owner.address, max_checkpoints=sp.none, level=59)) == 1000000000000 - 10 - 20 - 100)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=9)) == 0)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=10)) == 10)
     scenario.verify(fa2.get_prior_balance(sp.record(owner=user1.address, max_checkpoints=sp.none, level=11)) == 10)
@@ -715,7 +730,7 @@ def test_balance_of():
     # Get the test environment
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
-    admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
@@ -733,13 +748,13 @@ def test_balance_of():
             address=dummyContract.address,
             entry_point="receive_balances").open_some()
 
-    # Transfer some editions from the admin to two users
+    # Transfer some editions from the initial owner to two users
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=10),
                  sp.record(to_=user2.address, token_id=0, amount=20)])
-        ]).run(sender=admin)
+        ]).run(sender=initial_owner)
 
     # Check the balances using the on-chain view
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == 10)
@@ -776,18 +791,19 @@ def test_update_operators():
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
     fa2 = testEnvironment["fa2"]
 
-    # Transfer some editions from the admin to two users
+    # Transfer some editions from the initial owner to two users
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=10),
                  sp.record(to_=user2.address, token_id=0, amount=20)])
-        ]).run(sender=admin)
+        ]).run(sender=initial_owner)
 
     # Check that the operators information is empty
     scenario.verify(~fa2.is_operator(
@@ -961,6 +977,7 @@ def test_add_max_share_exception():
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
@@ -969,9 +986,9 @@ def test_add_max_share_exception():
     # Check that it's not possible to transfer more than the allowed share of tokens
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share)])
-        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+        ]).run(valid=False, sender=initial_owner, exception="FA2_SHARE_EXCESS")
  
     # Add the first user address as an exception
     fa2.add_max_share_exception(user1.address).run(sender=admin)
@@ -979,9 +996,9 @@ def test_add_max_share_exception():
     # Check that now is possible to transfer more than the allowed share of tokens
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=fa2.data.max_share)])
-        ]).run(sender=admin)
+        ]).run(sender=initial_owner)
 
     # Add user 2 as another exception
     fa2.add_max_share_exception(user2.address).run(sender=admin)
@@ -989,18 +1006,20 @@ def test_add_max_share_exception():
     # Check that now is possible to transfer more than the allowed share of tokens
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user2.address, token_id=0, amount=fa2.data.max_share + 100)])
-        ]).run(sender=admin)
+        ]).run(sender=initial_owner)
 
     # Check that only the admin can add exceptions
+    fa2.add_max_share_exception(user3.address).run(valid=False, sender=initial_owner, exception="FA2_NOT_ADMIN")
     fa2.add_max_share_exception(user3.address).run(valid=False, sender=user2, exception="FA2_NOT_ADMIN")
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == sp.as_nat(fa2.data.supply - (2 * fa2.data.max_share + 100)))
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == sp.as_nat(fa2.data.supply - (2 * fa2.data.max_share + 100)))
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == fa2.data.max_share)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == fa2.data.max_share + 100)
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 0)
+    scenario.verify(fa2.data.max_share_exceptions.contains(initial_owner.address))
     scenario.verify(fa2.data.max_share_exceptions.contains(user1.address))
     scenario.verify(fa2.data.max_share_exceptions.contains(user2.address))
     scenario.verify(~fa2.data.max_share_exceptions.contains(user3.address))
@@ -1008,7 +1027,8 @@ def test_add_max_share_exception():
     # Remove user 2 from the exception list
     fa2.add_max_share_exception(user2.address).run(sender=admin)
 
-    # Check that the exception list contains only the first user
+    # Check that the exception list contains only the initial owner and the first user
+    scenario.verify(fa2.data.max_share_exceptions.contains(initial_owner.address))
     scenario.verify(fa2.data.max_share_exceptions.contains(user1.address))
     scenario.verify(~fa2.data.max_share_exceptions.contains(user2.address))
     scenario.verify(~fa2.data.max_share_exceptions.contains(user3.address))
@@ -1016,9 +1036,9 @@ def test_add_max_share_exception():
     # Check that user 2 can't receive more tokens, but can transfer their tokens
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user2.address, token_id=0, amount=1)])
-        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+        ]).run(valid=False, sender=initial_owner, exception="FA2_SHARE_EXCESS")
     fa2.transfer([
         sp.record(
             from_=user2.address,
@@ -1028,12 +1048,12 @@ def test_add_max_share_exception():
     # Check that user 1 can still receive more tokens
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=1)])
-        ]).run(sender=admin)
+        ]).run(sender=initial_owner)
 
     # Check that the contract information has been updated
-    scenario.verify(fa2.get_balance(sp.record(owner=admin.address, token_id=0)) == sp.as_nat(fa2.data.supply - (2 * fa2.data.max_share + 100 + 1)))
+    scenario.verify(fa2.get_balance(sp.record(owner=initial_owner.address, token_id=0)) == sp.as_nat(fa2.data.supply - (2 * fa2.data.max_share + 100 + 1)))
     scenario.verify(fa2.get_balance(sp.record(owner=user1.address, token_id=0)) == fa2.data.max_share + 1)
     scenario.verify(fa2.get_balance(sp.record(owner=user2.address, token_id=0)) == sp.as_nat(fa2.data.max_share + 100 - 10))
     scenario.verify(fa2.get_balance(sp.record(owner=user3.address, token_id=0)) == 10)
@@ -1045,6 +1065,7 @@ def test_set_max_share():
     testEnvironment = get_test_environment()
     scenario = testEnvironment["scenario"]
     admin = testEnvironment["admin"]
+    initial_owner = testEnvironment["initial_owner"]
     user1 = testEnvironment["user1"]
     user2 = testEnvironment["user2"]
     user3 = testEnvironment["user3"]
@@ -1054,9 +1075,9 @@ def test_set_max_share():
     original_max_share = scenario.compute(fa2.data.max_share)
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=original_max_share)])
-        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+        ]).run(valid=False, sender=initial_owner, exception="FA2_SHARE_EXCESS")
 
     # Check that only the admin can change the max share parameter
     new_max_share = fa2.data.supply * 3 // 100
@@ -1070,14 +1091,14 @@ def test_set_max_share():
     # Check that it's not possible to transfer more than the allowed share of tokens
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=new_max_share)])
-        ]).run(valid=False, sender=admin, exception="FA2_SHARE_EXCESS")
+        ]).run(valid=False, sender=initial_owner, exception="FA2_SHARE_EXCESS")
     fa2.transfer([
         sp.record(
-            from_=admin.address,
+            from_=initial_owner.address,
             txs=[sp.record(to_=user1.address, token_id=0, amount=sp.as_nat(new_max_share - 1))])
-        ]).run(sender=admin)
+        ]).run(sender=initial_owner)
 
     # Check that the maximum share can only be set within the 1% and 10% limits
     fa2.set_max_share(sp.as_nat((fa2.data.supply // 100) - 1)).run(

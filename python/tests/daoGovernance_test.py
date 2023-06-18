@@ -57,6 +57,7 @@ def get_test_environment(vote_weight_mode="linear", decimals=1):
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://aaa"),
         token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
+        initial_owner=admin.address,
         supply=2000 * decimals,
         max_share=500 * decimals)
     scenario += token

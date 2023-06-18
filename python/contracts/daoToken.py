@@ -107,8 +107,8 @@ class DAOToken(sp.Contract):
         }
     }
 
-    def __init__(self, administrator, metadata, token_metadata, supply,
-                 max_share):
+    def __init__(self, administrator, metadata, token_metadata, initial_owner,
+                 supply, max_share):
         """Initializes the contract.
 
         """
@@ -143,7 +143,7 @@ class DAOToken(sp.Contract):
         self.init(
             administrator=administrator,
             metadata=metadata,
-            ledger=sp.big_map({administrator: supply}),
+            ledger=sp.big_map({initial_owner: supply}),
             supply=supply,
             max_share=max_share,
             token_metadata=sp.big_map({
@@ -151,7 +151,7 @@ class DAOToken(sp.Contract):
             operators=sp.big_map(),
             checkpoints=sp.big_map(),
             n_checkpoints=sp.big_map(),
-            max_share_exceptions=sp.set([]),
+            max_share_exceptions=sp.set([initial_owner]),
             proposed_administrator=sp.none)
 
         # Build the TZIP-016 contract metadata
@@ -430,6 +430,8 @@ class DAOToken(sp.Contract):
             max_checkpoints=sp.TOption(sp.TNat)).layout(("owner", ("level", "max_checkpoints"))))
 
         # Check that the requested level is smaller than the current level
+        # It's important that it's not equal to the current level to avoid
+        # possible batched transaction exploits
         sp.verify(params.level < sp.level, message="FA2_WRONG_LEVEL")
 
         # Check that, if defined, max checkpoints is larger than zero
@@ -546,5 +548,6 @@ sp.add_compilation_target("daoToken", DAOToken(
     administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
     metadata=sp.utils.metadata_of_url("ipfs://QmbmLBSisoZYXr7F7nFBeZMYUmf2Vnd4QKP77FyHPTdWMX"),
     token_metadata=sp.utils.bytes_of_string("ipfs://QmXkMe3tPtZ7jz3swpBXbubAM8UCcmSsDcrbuZNMeXHFf8"),
+    initial_owner=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
     supply=8000000000000,
     max_share=400000000000))

@@ -69,35 +69,31 @@ def get_test_environment():
     treasury = sp.test_account("treasury")
     external_user = sp.test_account("external_user")
 
-    # Initialize the DAO token FA2 contract
-    daoToken = daoTokenModule.DAOToken(
-        administrator=admin.address,
-        metadata=sp.utils.metadata_of_url("ipfs://aaa"),
-        token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
-        supply=1500,
-        max_share=350)
-    scenario += daoToken
-
     # Initialize the DAO token drop contract to use the first Merkle tree
     daoTokenDrop = daoTokenDropModule.DAOTokenDrop(
         administrator=admin.address,
         metadata=sp.utils.metadata_of_url("ipfs://ccc"),
-        token=daoToken.address,
+        token=admin.address,
         treasury=treasury.address,
         merkle_root=merkle_root_1,
         expiration_date=sp.timestamp_from_utc(2022, 12, 31, 23, 59, 59))
     scenario += daoTokenDrop
 
-    # Add the DAO token drop contract and the treasury as maximum share exceptions
-    daoToken.add_max_share_exception(daoTokenDrop.address).run(sender=admin)
-    daoToken.add_max_share_exception(treasury.address).run(sender=admin)
+    # Initialize the DAO token FA2 contract
+    daoToken = daoTokenModule.DAOToken(
+        administrator=admin.address,
+        metadata=sp.utils.metadata_of_url("ipfs://aaa"),
+        token_metadata=sp.utils.bytes_of_string("ipfs://bbb"),
+        initial_owner=daoTokenDrop.address,
+        supply=1500,
+        max_share=350)
+    scenario += daoToken
 
-    # Transfer all the editions from the admin to the DAO token drop contract
-    daoToken.transfer([
-        sp.record(
-            from_=admin.address,
-            txs=[sp.record(to_=daoTokenDrop.address, token_id=0, amount=1500)])
-        ]).run(sender=admin)
+    # Update the DAO token address in the DAO token drop contract
+    daoTokenDrop.update_token(daoToken.address).run(sender=admin)
+
+    # Add the DAO treasury as a maximum share exception
+    daoToken.add_max_share_exception(treasury.address).run(sender=admin)
 
     # Save all the variables in a test environment dictionary
     testEnvironment = {
@@ -254,6 +250,29 @@ def test_transfer_to_treasury():
     scenario.verify(daoTokenDrop.claimed_tokens(user3) == 0)
     scenario.verify(daoTokenDrop.claimed_tokens(user4) == 0)
     scenario.verify(daoTokenDrop.claimed_tokens(treasury.address) == 0)
+
+
+@sp.add_test(name="Test update token")
+def test_update_token():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    treasury = testEnvironment["treasury"]
+    daoToken = testEnvironment["daoToken"]
+    daoTokenDrop = testEnvironment["daoTokenDrop"]
+
+    # Check the original token address
+    scenario.verify(daoTokenDrop.data.token == daoToken.address)
+
+    # Check that only the admin can update the token address
+    new_token = sp.test_account("new_token")
+    daoTokenDrop.update_token(new_token.address).run(
+        valid=False, sender=user1, exception="DROP_NOT_ADMIN")
+    daoTokenDrop.update_token(new_token.address).run(sender=admin)
+
+    # Check that the contracts information have been updated
+    scenario.verify(daoTokenDrop.data.token == new_token.address)
 
 
 @sp.add_test(name="Test update treasury")
