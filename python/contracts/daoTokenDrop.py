@@ -319,9 +319,9 @@ class DAOTokenDrop(sp.Contract):
 
 
 sp.add_compilation_target("daoTokenDrop", DAOTokenDrop(
-    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
+    administrator=sp.address("tz1RssrimWo3B8TpCajiNjqBD3MfhUwEgxod"),
     metadata=sp.utils.metadata_of_url("ipfs://QmNhC5Uucwh8TRfzL8xxo2y7RbJVkShuVr8dXCfoFoVCZ5"),
-    token=sp.address("KT1Bdh3NcpSnTy9kPGQLzBr9u51KHfPYqCnN"),
-    treasury=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
-    merkle_root=sp.bytes("0x00"),
-    expiration_date=sp.timestamp_from_utc(2023, 5, 30, 23, 59, 59)))
+    token=sp.address("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton"),
+    treasury=sp.address("KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb"),
+    merkle_root=sp.bytes("0x09b3bfe2615514519988b05eb69b9cb69383ed9e060bec3693a3fc8801dbf2b3"),
+    expiration_date=sp.timestamp_from_utc(2023, 11, 22, 23, 59, 59)))

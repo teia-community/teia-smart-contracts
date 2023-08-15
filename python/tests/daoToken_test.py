@@ -971,6 +971,28 @@ def test_set_metadata():
     scenario.verify(fa2.data.metadata[extra_metadata.k] == extra_metadata.v)
 
 
+@sp.add_test(name="Test set token metadata")
+def test_set_token_metadata():
+    # Get the test environment
+    testEnvironment = get_test_environment()
+    scenario = testEnvironment["scenario"]
+    admin = testEnvironment["admin"]
+    user1 = testEnvironment["user1"]
+    fa2 = testEnvironment["fa2"]
+
+    # Check that the initial token metadata is correct
+    original_token_metadata = sp.utils.bytes_of_string("ipfs://bbb")
+    scenario.verify(fa2.data.token_metadata[0].token_info[""] == original_token_metadata)
+
+    # Check that only the admin can update the token metadata
+    new_token_metadata = sp.utils.bytes_of_string("ipfs://zzzz")
+    fa2.set_token_metadata(new_token_metadata).run(valid=False, sender=user1, exception="FA2_NOT_ADMIN")
+    fa2.set_token_metadata(new_token_metadata).run(sender=admin)
+
+    # Check that the token metadata is updated
+    scenario.verify(fa2.data.token_metadata[0].token_info[""] == new_token_metadata)
+
+
 @sp.add_test(name="Test add max share exception")
 def test_add_max_share_exception():
     # Get the test environment

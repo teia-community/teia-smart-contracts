@@ -381,6 +381,20 @@ class DAOToken(sp.Contract):
         self.data.metadata[params.k] = params.v
 
     @sp.entry_point
+    def set_token_metadata(self, token_metadata):
+        """Updates the token metadata.
+
+        """
+        # Define the input parameter data type
+        sp.set_type(token_metadata, sp.TBytes)
+
+        # Check that the administrator executed the entry point
+        self.check_is_administrator()
+
+        # Update the token metadata
+        self.data.token_metadata[0].token_info[""] = token_metadata
+
+    @sp.entry_point
     def add_max_share_exception(self, exception):
         """Adds or removes an exception to the set of addresses that can own
         more tokens than the maximum share.
@@ -545,9 +559,9 @@ if "tzip16_error_inline" in environ.get("TEIA_SC_PARAMS", "").split(":"):
             ).inject_into_smartpy(sp).add_base_metadata(DAOToken)
 
 sp.add_compilation_target("daoToken", DAOToken(
-    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
+    administrator=sp.address("tz1RssrimWo3B8TpCajiNjqBD3MfhUwEgxod"),
     metadata=sp.utils.metadata_of_url("ipfs://QmbmLBSisoZYXr7F7nFBeZMYUmf2Vnd4QKP77FyHPTdWMX"),
-    token_metadata=sp.utils.bytes_of_string("ipfs://QmXkMe3tPtZ7jz3swpBXbubAM8UCcmSsDcrbuZNMeXHFf8"),
-    initial_owner=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
+    token_metadata=sp.utils.bytes_of_string("ipfs://Qmf63CUkCGjJWM8YKsp8XDiauPVhVEdArmozrjzTtKhd8z"),
+    initial_owner=sp.address("KT1StiWr1bqAfu7y1pLUkUC8zhwLmHpvJuJ7"),
     supply=8000000000000,
     max_share=400000000000))
