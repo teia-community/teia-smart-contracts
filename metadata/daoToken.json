@@ -2,7 +2,7 @@
   "name": "Teia DAO FA2 token contract",
   "description": "DAO token contract used in the Teia DAO",
   "version": "1.0.0",
-  "authors": [ "Teia Community  <https://twitter.com/TeiaCommunity>" ],
+  "authors": [ "Teia Community <https://twitter.com/TeiaCommunity>" ],
   "homepage": "https://teia.art",
   "source": { "tools": [ "SmartPy 0.16.0" ], "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/daoToken.py" },
   "license": { "name": "MIT", "details": "The MIT License" },

@@ -5,13 +5,13 @@
 | [Teia Marketplace (v1)](python/contracts/teiaMarketplace_v1.py) | [KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w](https://tzkt.io/KT1PHubm9HtyQEJ4BBpMTVomq6mhbfNZ9z5w) | Audited |
 | [Multisig Wallet / mini-DAO (v1)](python/contracts/multisigWallet_v1.py) | [KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P](https://tzkt.io/KT1PKBTVmdxfgkFvSeNUQacYiEFsPBw16B4P) | Audited |
 | [Core Team multisig](python/contracts/daoMultisig.py) | [KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb](https://tzkt.io/KT1J9FYz29RBQi1oGLw8uXyACrzXzV1dHuvb) | Deployed |
+| [DAO token](python/contracts/daoToken.py) | [KT1QrtA753MSv8VGxkDrKKyJniG5JtuHHbtV](https://tzkt.io/KT1QrtA753MSv8VGxkDrKKyJniG5JtuHHbtV) | Deployed |
+| [DAO token distributor](python/contracts/daoTokenDrop.py) | [KT1NrfV4e2qWqFrnrKyPTJth5wq2KP9VyBei](https://tzkt.io/KT1NrfV4e2qWqFrnrKyPTJth5wq2KP9VyBei) | Deployed |
 | [Extended FA1.2 token](python/contracts/fa12.py) | | Prototype |
 | [Extended FA2 token](python/contracts/fa2.py) | | Prototype |
 | [Extended FA2 token minter](python/contracts/minter.py) | | Prototype |
 | [Marketplace for the extended FA2 token](python/contracts/marketplace.py) | | Prototype |
 | [Artists collaboration](python/contracts/artistsCollaboration.py) | | Prototype |
-| [DAO token](python/contracts/daoToken.py) | | Prototype |
-| [DAO token distributor](python/contracts/daoTokenDrop.py) | | Prototype |
 | [DAO governance](python/contracts/daoGovernance.py) | | Prototype |
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |

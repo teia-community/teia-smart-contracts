@@ -560,8 +560,8 @@ if "tzip16_error_inline" in environ.get("TEIA_SC_PARAMS", "").split(":"):
 
 sp.add_compilation_target("daoToken", DAOToken(
     administrator=sp.address("tz1RssrimWo3B8TpCajiNjqBD3MfhUwEgxod"),
-    metadata=sp.utils.metadata_of_url("ipfs://QmbmLBSisoZYXr7F7nFBeZMYUmf2Vnd4QKP77FyHPTdWMX"),
-    token_metadata=sp.utils.bytes_of_string("ipfs://Qmf63CUkCGjJWM8YKsp8XDiauPVhVEdArmozrjzTtKhd8z"),
-    initial_owner=sp.address("KT1StiWr1bqAfu7y1pLUkUC8zhwLmHpvJuJ7"),
+    metadata=sp.utils.metadata_of_url("ipfs://QmeXpWrkHZSth2gsM1c6tPZe61RKSERexqmm3okgGZxZ2F"),
+    token_metadata=sp.utils.bytes_of_string("ipfs://QmaQywJXcjWZKT3Gu2n15A3ip4q2Y79WghGG2dFxxtYgNV"),
+    initial_owner=sp.address("KT1NrfV4e2qWqFrnrKyPTJth5wq2KP9VyBei"),
     supply=8000000000000,
     max_share=400000000000))
