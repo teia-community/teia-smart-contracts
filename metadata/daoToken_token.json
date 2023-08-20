@@ -3,6 +3,7 @@
     "symbol": "TEIA",
     "decimals": 6,
     "shouldPreferSymbol": false,
-    "displayUri":"ipfs://QmVnxwokz52NApsRRdivcmowErFqbfkSXLX3iNu6pMrLVv",
-    "thumbnailUri": "ipfs://QmVnxwokz52NApsRRdivcmowErFqbfkSXLX3iNu6pMrLVv"
+    "displayUri":"ipfs://Qmcu6cpSWNV1fjPQdDLRzWr1kGXAwCnVF4MEno1yWQ99t3",
+    "thumbnailUri": "ipfs://QmPen6FjwcnuN2yin335WA2Ae6j9FrBN17isHs9NGq2b7Q",
+    "logoDesigner": "Julio Glatt"
 }
