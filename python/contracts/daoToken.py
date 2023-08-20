@@ -91,7 +91,7 @@ class DAOToken(sp.Contract):
                      "expansion": {"string": "The account that executed the entry point is not the token owner"},
                      "languages": ["en"]},
                     {"error": {"string": "FA2_WRONG_LEVEL"},
-                     "expansion": {"string": "The provided block level is higher thant the current block level"},
+                     "expansion": {"string": "The provided block level is higher than the current block level"},
                      "languages": ["en"]},
                     {"error": {"string": "FA2_WRONG_MAX_SHARE"},
                      "expansion": {"string": "The value of the max share parameter is not within the expected range"},
