@@ -16,7 +16,7 @@ class Donations(sp.Contract):
         # The percentage per mile of the funds to donate
         pct=sp.TNat))
 
-    def __init__(self, administrator, metadata, oXTZ):
+    def __init__(self, administrator, splits, metadata, oXTZ):
         """Initializes the contract.
 
         """
@@ -38,7 +38,7 @@ class Donations(sp.Contract):
             administrator=administrator,
             metadata=metadata,
             oXTZ=oXTZ,
-            splits=sp.list([]),
+            splits=splits,
             proposed_administrator=sp.none))
 
     def check_is_administrator(self):
@@ -261,6 +261,8 @@ class Donations(sp.Contract):
 
 
 sp.add_compilation_target("donations", Donations(
-    administrator=sp.address("tz1RssrimWo3B8TpCajiNjqBD3MfhUwEgxod"),
-    metadata=sp.utils.metadata_of_url("ipfs://bafkreicrnzzdn3v6fgvvtmpjr2op3x6qn2cgitktgxwxp4ezqmj2hqu3ry"),
+    administrator=sp.address("KT1X1jyohFrZyDYWvCPXw9KvWxk2VDwxyg2g"),
+    splits=sp.list([
+        sp.record(address=sp.address("KT1X1jyohFrZyDYWvCPXw9KvWxk2VDwxyg2g"), pct=1000)]),
+    metadata=sp.utils.metadata_of_url("ipfs://QmNhK9euaEqU8vo81VRnQzSvPDbbnaTunbokczcziuzCZx"),
     oXTZ=sp.address("KT1TjnZYs5CGLbmV6yuW169P8Pnr9BiVwwjz")))

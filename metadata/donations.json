@@ -1,13 +1,13 @@
 {
-    "name": "Tezos for Iran donations contract",
-    "description": "This contract distributes funds for the Tezos for Iran donation campaing",
+    "name": "TezQuakeAid donation address for Morocco",
+    "description": "This address is set up to gather donations towards earthquake relief for Morroco in 2023. The Funds are managed by the TezQuakeAid multisig. Any donations received at this address after the conclusion of the Morocco relief event might be redirected to support other global emergency response initiatives.",
     "version": "1.0.0",
     "license": {
         "name": "MIT",
         "details": "The MIT License"
     },
     "source": {
-        "tools": ["SmartPy 0.14.0"],
+        "tools": ["SmartPy 0.16.0"],
         "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/donations.py"
     }
 }
