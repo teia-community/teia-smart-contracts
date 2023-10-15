@@ -13,7 +13,7 @@ multisigWalletModule = sp.io.import_script_from_url("file:contracts/multisigWall
 
 
 class Recipient(sp.Contract):
-    """This contract simulates a user that can recive tez transfers.
+    """This contract simulates a user that can receive tez transfers.
 
     It should only be used to test that tez transfers are sent correctly.
 
@@ -244,11 +244,11 @@ def test_text_proposal():
     scenario.verify(token.data.ledger[user4.address] == 400 - 10)
     scenario.verify(token.data.ledger[dao.address] == 10)
 
-    # Check that it's not possible to vote an innexisting proposal
+    # Check that it's not possible to vote an nonexistent proposal
     dao.representatives_vote(proposal_id=1, vote=sp.variant("abstain", sp.unit)).run(
-        valid=False, sender=user1, now=sp.timestamp(200), level=20, exception="DAO_INEXISTENT_PROPOSAL")
+        valid=False, sender=user1, now=sp.timestamp(200), level=20, exception="DAO_NONEXISTENT_PROPOSAL")
     dao.token_vote(proposal_id=1, vote=sp.variant("abstain", sp.unit), max_checkpoints=sp.none).run(
-        valid=False, sender=user1, now=sp.timestamp(200), level=20, exception="DAO_INEXISTENT_PROPOSAL")
+        valid=False, sender=user1, now=sp.timestamp(200), level=20, exception="DAO_NONEXISTENT_PROPOSAL")
 
     # Check that it's not possible to vote without tokens
     dao.token_vote(proposal_id=0, vote=sp.variant("abstain", sp.unit), max_checkpoints=sp.none).run(
@@ -326,17 +326,17 @@ def test_text_proposal():
     dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
         valid=False, sender=user6, now=sp.timestamp(101).add_days(5), level=50, exception="DAO_CLOSED_PROPOSAL")
 
-    # Check that it's not possible to evaluate an innexisting proposal
+    # Check that it's not possible to evaluate an nonexistent proposal
     dao.evaluate_voting_result(1).run(
-        valid=False, sender=user1, now=sp.timestamp(101).add_days(5), level=60, exception="DAO_INEXISTENT_PROPOSAL")
+        valid=False, sender=user1, now=sp.timestamp(101).add_days(5), level=60, exception="DAO_NONEXISTENT_PROPOSAL")
 
     # Check that it's not possible to execute a proposal that is not yet approved
     dao.execute_proposal(0).run(
         valid=False, sender=user1, exception="DAO_STATUS_NOT_APPROVED")
 
-    # Check that it's not possible to execute an innexisting proposal
+    # Check that it's not possible to execute an nonexistent proposal
     dao.execute_proposal(1).run(
-        valid=False, sender=user1, exception="DAO_INEXISTENT_PROPOSAL")
+        valid=False, sender=user1, exception="DAO_NONEXISTENT_PROPOSAL")
 
     # Evaluate the proposal results
     dao.evaluate_voting_result(0).run(
@@ -351,7 +351,7 @@ def test_text_proposal():
     scenario.verify(token.data.ledger[user4.address] == 400)
     scenario.verify(token.data.ledger[dao.address] == 0)
 
-    # Check that it's not possible to execute a proposal before the wating time
+    # Check that it's not possible to execute a proposal before the waiting time
     # has passed
     dao.execute_proposal(0).run(
         valid=False, sender=user1, now=sp.timestamp(101).add_days(5 + 1), exception="DAO_WAITING_PROPOSAL")
@@ -836,9 +836,9 @@ def test_cancel_proposal():
     dao.token_vote(proposal_id=0, vote=sp.variant("yes", sp.unit), max_checkpoints=sp.none).run(
         sender=user5, now=sp.timestamp(400), level=40)
 
-    # Check that it's not possible to cancel an innexisting proposal
+    # Check that it's not possible to cancel an nonexistent proposal
     dao.cancel_proposal(proposal_id=1, return_escrow=True).run(
-        valid=False, sender=user4, now=sp.timestamp(500), level=50, exception="DAO_INEXISTENT_PROPOSAL")
+        valid=False, sender=user4, now=sp.timestamp(500), level=50, exception="DAO_NONEXISTENT_PROPOSAL")
 
     # Check that only the proposal issuer can cancel the proposal
     dao.cancel_proposal(proposal_id=0, return_escrow=True).run(

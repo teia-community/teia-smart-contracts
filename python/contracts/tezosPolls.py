@@ -91,7 +91,7 @@ class TezosPolls(sp.Contract):
 
         # Check that the poll can still be voted
         poll = sp.compute(self.data.polls.get(
-            params.poll_id, message="INEXISTENT_POLL"))
+            params.poll_id, message="NONEXISTENT_POLL"))
         can_vote = sp.now < poll.timestamp.add_days(
             sp.to_int(poll.voting_period))
         sp.verify(can_vote, message="CLOSED_POLL")
@@ -134,7 +134,7 @@ class TezosPolls(sp.Contract):
 
         # Check that the poll id is present in the polls big map
         sp.verify(self.data.polls.contains(poll_id),
-                  message="INEXISTENT_POLL")
+                  message="NONEXISTENT_POLL")
 
         # Return the poll information
         sp.result(self.data.polls[poll_id])

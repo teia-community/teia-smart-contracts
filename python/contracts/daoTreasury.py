@@ -238,4 +238,4 @@ class DAOTreasury(sp.Contract):
 
 sp.add_compilation_target("daoTreasury", DAOTreasury(
     metadata=sp.utils.metadata_of_url("ipfs://QmewNgfyryssmkFHnr46vPDXeA8JiDMyfViDhNGSb8Voe4"),
-    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN")))
+    administrator=sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx")))

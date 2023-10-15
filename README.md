@@ -16,6 +16,7 @@
 | [DAO treasury](python/contracts/daoTreasury.py) | | Prototype |
 | [DAO representatives](python/contracts/representatives.py) | | Prototype |
 | [Teia Core Team vote](python/contracts/coreTeamVote.py) | | Prototype |
+| [Teia polls](python/contracts/teiaPolls.py) | | Prototype |
 | [Harberger token](python/contracts/harbergerToken.py) | | Prototype |
 | [Harberger fee](python/contracts/harbergerFee.py) | | Prototype |
 | [Harberger token minter](python/contracts/harbergerMinter.py) | | Prototype |
@@ -54,6 +55,7 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py ../output/contracts/representatives --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/daoMultisig.py ../output/contracts/daoMultisig --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/coreTeamVote.py ../output/contracts/coreTeamVote --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/teiaPolls.py ../output/contracts/teiaPolls --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py ../output/contracts/harbergerToken --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py ../output/contracts/harbergerFee --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerMinter.py ../output/contracts/harbergerMinter --html --purge
@@ -82,5 +84,6 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/daoGovernance_test.py ../output/tests/daoGovernance --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/representatives_test.py ../output/tests/representatives --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/daoMultisig_test.py ../output/tests/daoMultisig --html --purge
+~/smartpy-cli/SmartPy.sh test tests/teiaPolls_test.py ../output/tests/teiaPolls --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/deadMansSwitch_test.py ../output/tests/deadMansSwitch --html --purge
 ```

@@ -205,6 +205,9 @@ class DAOGovernance(sp.Contract):
                    {"error": {"string": "DAO_NOT_ISSUER_OR_GUARDIAN"},
                     "expansion": {"string": "The account that executed the entry point is not the proposal issuer or the DAO guardians"},
                     "languages": ["en"]},
+                   {"error": {"string": "DAO_NONEXISTENT_PROPOSAL"},
+                    "expansion": {"string": "There is no proposal with the given id"},
+                    "languages": ["en"]},
                    {"error": {"string": "DAO_STATUS_NOT_OPEN_OR_APPROVED"},
                     "expansion": {"string": "The proposal status is not open or approved, so it cannot be cancelled anymore"},
                     "languages": ["en"]},
@@ -524,7 +527,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
-            params.proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
+            params.proposal_id, message="DAO_NONEXISTENT_PROPOSAL"))
 
         # Check that the proposal status is still set as open
         sp.verify(proposal.status.is_variant("open"),
@@ -590,7 +593,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
-            params.proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
+            params.proposal_id, message="DAO_NONEXISTENT_PROPOSAL"))
 
         # Check that the proposal status is still set as open
         sp.verify(proposal.status.is_variant("open"),
@@ -644,7 +647,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
-            params.proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
+            params.proposal_id, message="DAO_NONEXISTENT_PROPOSAL"))
 
         # Check that the address that called the entry point is the proposal
         # issuer or the DAO guardians
@@ -699,7 +702,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
-            proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
+            proposal_id, message="DAO_NONEXISTENT_PROPOSAL"))
 
         # Check that the proposal status is still set as open
         sp.verify(proposal.status.is_variant("open"),
@@ -792,7 +795,7 @@ class DAOGovernance(sp.Contract):
 
         # Check that the proposal exists
         proposal = sp.compute(self.data.proposals.get(
-            proposal_id, message="DAO_INEXISTENT_PROPOSAL"))
+            proposal_id, message="DAO_NONEXISTENT_PROPOSAL"))
 
         # Check that the proposal is approved
         sp.verify(proposal.status.is_variant("approved"),
@@ -1002,24 +1005,24 @@ token_decimals = 1000000
 
 sp.add_compilation_target("dao", DAOGovernance(
     metadata=sp.utils.metadata_of_url("ipfs://QmSc7n5jmSe4hJw6qFBdp8n3Aiv97yutMiZn5zhyfTuEMt"),
-    administrator=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
-    treasury=sp.address("KT1DrU2jEyFjYxku4fFmk2mBt7XAuD7Y1x2N"),
-    token=sp.address("KT1Bdh3NcpSnTy9kPGQLzBr9u51KHfPYqCnN"),
-    representatives=sp.address("KT1949LMECi1oRejnJP7Yphzsyhj9ADaX7Wu"),
-    guardians=sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"),
-    quorum=8000 * token_decimals,
+    administrator=sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"),
+    treasury=sp.address("KT1BVyCC1dfQKH4T35Zyp3zDY97CX2m5R6Qw"),
+    token=sp.address("KT1QrtA753MSv8VGxkDrKKyJniG5JtuHHbtV"),
+    representatives=sp.address("KT1UgY8wHUVU9Lhv54qJgrqgDSMZ2x6VeLr1"),
+    guardians=sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"),
+    quorum=40000 * token_decimals,
     governance_parameters=sp.record(
         vote_method=sp.variant("linear", sp.unit),
         vote_period=2,
         wait_period=1,
-        escrow_amount=10 * token_decimals,
+        escrow_amount=0 * token_decimals,
         escrow_return=30,
         min_amount=1 * token_decimals,
         supermajority=70,
         representatives_share=30,
         representative_max_share=3,
-        quorum_update_period=10,
+        quorum_update_period=3,
         quorum_update=20,
         quorum_max_change=20,
-        min_quorum=1000 * token_decimals,
-        max_quorum=100000 * token_decimals)))
+        min_quorum=10000 * token_decimals,
+        max_quorum=2000000 * token_decimals)))

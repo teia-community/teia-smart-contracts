@@ -1,0 +1,24 @@
+{
+  "name": "Teia multi-option polls contract prototype",
+  "description": "Multi-option polls contract used for the Teia DAO",
+  "version": "1.0.0",
+  "authors": [ "Teia Community " ],
+  "homepage": "https://teia.art",
+  "source": { "tools": [ "SmartPy 0.16.0" ], "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/teiaPolls.py" },
+  "license": { "name": "MIT", "details": "The MIT License" },
+  "interfaces": [ "TZIP-016" ],
+  "errors": [
+    { "error": { "string": "POLL_NOT_DAO_MEMBER" }, "expansion": { "string": "The account that executed the entry point is not a DAO token holder" }, "languages": [ "en" ] },
+    { "error": { "string": "POLL_WRONG_OPTIONS" }, "expansion": { "string": "There must be at least two options to vote in the poll" }, "languages": [ "en" ] },
+    { "error": { "string": "POLL_WRONG_VOTE_PERIOD" }, "expansion": { "string": "The poll voting period should be between 1 and 30 days" }, "languages": [ "en" ] },
+    { "error": { "string": "POLL_NONEXISTENT_POLL" }, "expansion": { "string": "There is no poll with the given id" }, "languages": [ "en" ] },
+    { "error": { "string": "POLL_WRONG_OPTION" }, "expansion": { "string": "The poll doesn't have the provided vote option" }, "languages": [ "en" ] },
+    { "error": { "string": "POLL_CLOSED_POLL" }, "expansion": { "string": "The poll voting period has passed and it is not possible to vote it anymore" }, "languages": [ "en" ] },
+    {
+      "error": { "string": "POLL_INSUFICIENT_BALANCE" },
+      "expansion": { "string": "The account that executed the entry point does not have enough DAO tokens to vote the poll" },
+      "languages": [ "en" ]
+    },
+    { "error": { "string": "POLL_NO_USER_VOTE" }, "expansion": { "string": "The user didn't vote for the given poll yet" }, "languages": [ "en" ] }
+  ]
+}

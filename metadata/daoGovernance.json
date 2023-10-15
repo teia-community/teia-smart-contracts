@@ -14,6 +14,7 @@
       "expansion": { "string": "The account that executed the entry point is not the proposal issuer or the DAO guardians" },
       "languages": [ "en" ]
     },
+    { "error": { "string": "DAO_NONEXISTENT_PROPOSAL" }, "expansion": { "string": "There is no proposal with the given id" }, "languages": [ "en" ] },
     {
       "error": { "string": "DAO_STATUS_NOT_OPEN_OR_APPROVED" },
       "expansion": { "string": "The proposal status is not open or approved, so it cannot be cancelled anymore" },

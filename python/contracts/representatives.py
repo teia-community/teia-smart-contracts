@@ -428,12 +428,13 @@ class Representatives(sp.Contract):
 sp.add_compilation_target("representatives", Representatives(
     metadata=sp.utils.metadata_of_url("ipfs://QmSPr2fiDfnTXq7DemP9Eeh1dhrUwp4QFDDQYUhZKCqnMQ"),
     representatives={
-        sp.address("tz1YgDUQV2eXm8pUWNz3S5aWP86iFzNp4jnD"): "desperate tezos bakers",
-        sp.address("tz1c5of2FGiz5C5xpKieGAt2abJaz7VwmU9q"): "poor artists community",
-        sp.address("tz1h9TG6uuxv2FtmE5yqMyKQqx8hkXk7NY6c"): "not-so-smart contract devs",
-        sp.address("tz1gpLc1GQ7zMoSkPLcWmGRhEdoekU3ed6Pe"): "IPFS freaks",
-        sp.address("tz1XpohDbFnGbsMqaXtENMHWYYHhMVtBPSTR"): "compulsive writers",
-        sp.address("tz1gnL9CeM5h5kRzWZztFYLypCNnVQZjndBN"): "magnificent overlords"
+        sp.address("tz1MrSstDn96CnAKvmnfNspVXpqZKX1moKdx"): "community 1",
+        sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"): "community 2",
+        sp.address("tz1iJP1EtP9iSkmaEKCZznDMst91oJGB9SZ5"): "community 3",
+        sp.address("tz1auzguranCBAHCf6s8Nw27gDroPeopXDbJ"): "community 4",
+        sp.address("tz1P9djZkQKQdvt68eixoyBf8ezNYjgrEdue"): "community 5",
+        sp.address("tz1VdRFNxALoiYPbD7LWdacZQSVcc2YudM6D"): "community 6",
+        sp.address("tz1ZVzMVj6EjRoDNFMCguG7nGdqmD7aau9kS"): "community 7"
     },
-    minimum_votes=sp.nat(2),
+    minimum_votes=sp.nat(3),
     expiration_time=sp.nat(7)))

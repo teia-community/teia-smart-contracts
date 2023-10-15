@@ -14,6 +14,7 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/representatives.py /tmp/contracts/representatives
 ~/smartpy-cli/SmartPy.sh compile contracts/daoMultisig.py /tmp/contracts/daoMultisig
 ~/smartpy-cli/SmartPy.sh compile contracts/coreTeamVote.py /tmp/contracts/coreTeamVote
+~/smartpy-cli/SmartPy.sh compile contracts/teiaPolls.py /tmp/contracts/teiaPolls
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerToken.py /tmp/contracts/harbergerToken
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerFee.py /tmp/contracts/harbergerFee
 ~/smartpy-cli/SmartPy.sh compile contracts/harbergerMinter.py /tmp/contracts/harbergerMinter

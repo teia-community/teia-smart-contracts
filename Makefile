@@ -75,6 +75,7 @@ compile_all:
 	$(call COMPILE, representatives)
 	$(call COMPILE, daoMultisig)
 	$(call COMPILE, coreTeamVote)
+	$(call COMPILE, teiaPolls)
 	$(call COMPILE, harbergerToken)
 	$(call COMPILE, harbergerFee)
 	$(call COMPILE, harbergerMinter)
@@ -84,6 +85,7 @@ compile_all:
 	$(call COMPILE, donations)
 	$(call COMPILE, openLetter)
 	$(call COMPILE, tezosPolls)
+	$(call COMPILE, deadMansSwitch)
 
 test_all:
 	$(call TEST, teiaMarketplace_v1)
@@ -98,3 +100,5 @@ test_all:
 	$(call TEST, daoGovernance)
 	$(call TEST, representatives)
 	$(call TEST, daoMultisig)
+	$(call TEST, teiaPolls)
+	$(call TEST, deadMansSwitch)

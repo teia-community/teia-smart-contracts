@@ -11,4 +11,7 @@ cd python
 ~/smartpy-cli/SmartPy.sh test tests/daoTreasury_test.py /tmp/tests/daoTreasury
 ~/smartpy-cli/SmartPy.sh test tests/daoGovernance_test.py /tmp/tests/daoGovernance
 ~/smartpy-cli/SmartPy.sh test tests/representatives_test.py /tmp/tests/representatives
+~/smartpy-cli/SmartPy.sh test tests/daoMultisig_test.py /tmp/tests/daoMultisig
+~/smartpy-cli/SmartPy.sh test tests/teiaPolls_test.py /tmp/tests/teiaPolls
+~/smartpy-cli/SmartPy.sh test tests/deadMansSwitch_test.py /tmp/tests/deadMansSwitch
 cd - > /dev/null
