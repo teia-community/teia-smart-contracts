@@ -428,13 +428,7 @@ class Representatives(sp.Contract):
 sp.add_compilation_target("representatives", Representatives(
     metadata=sp.utils.metadata_of_url("ipfs://QmSPr2fiDfnTXq7DemP9Eeh1dhrUwp4QFDDQYUhZKCqnMQ"),
     representatives={
-        sp.address("tz1MrSstDn96CnAKvmnfNspVXpqZKX1moKdx"): "community 1",
-        sp.address("tz1g6JRCpsEnD2BLiAzPNK3GBD1fKicV9rCx"): "community 2",
-        sp.address("tz1iJP1EtP9iSkmaEKCZznDMst91oJGB9SZ5"): "community 3",
-        sp.address("tz1auzguranCBAHCf6s8Nw27gDroPeopXDbJ"): "community 4",
-        sp.address("tz1P9djZkQKQdvt68eixoyBf8ezNYjgrEdue"): "community 5",
-        sp.address("tz1VdRFNxALoiYPbD7LWdacZQSVcc2YudM6D"): "community 6",
-        sp.address("tz1ZVzMVj6EjRoDNFMCguG7nGdqmD7aau9kS"): "community 7"
+        sp.address("tz1RssrimWo3B8TpCajiNjqBD3MfhUwEgxod"): "test community",
     },
-    minimum_votes=sp.nat(3),
+    minimum_votes=sp.nat(1),
     expiration_time=sp.nat(7)))
