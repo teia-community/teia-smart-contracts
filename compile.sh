@@ -24,4 +24,6 @@ cd python
 ~/smartpy-cli/SmartPy.sh compile contracts/donations /tmp/contracts/donations
 ~/smartpy-cli/SmartPy.sh compile contracts/openLetter /tmp/contracts/openLetter
 ~/smartpy-cli/SmartPy.sh compile contracts/tezosPolls /tmp/contracts/tezosPolls
+~/smartpy-cli/SmartPy.sh compile contracts/si_fa2 /tmp/contracts/si_fa2
+~/smartpy-cli/SmartPy.sh compile contracts/si_list /tmp/contracts/si_list
 cd - > /dev/null

@@ -27,6 +27,8 @@
 | [Contract for signing open letters](python/contracts/openLetter.py) | | Prototype |
 | [Contract for creating polls](python/contracts/tezosPolls.py) | | Prototype |
 | [A dead's man switch contract](python/contracts/deadMansSwitch.py) | | Prototype |
+| [Spanish Inquisition FA2 token](python/contracts/si_fa2.py) | | Prototype |
+| [Spanish Inquisition list](python/contracts/si_list.py) | | Prototype |
 
 
 ## SmartPy installation
@@ -66,6 +68,8 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh compile contracts/openLetter.py ../output/contracts/openLetter --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/tezosPolls.py ../output/contracts/tezosPolls --html --purge
 ~/smartpy-cli/SmartPy.sh compile contracts/deadMansSwitch.py ../output/contracts/deadMansSwitch --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/si_fa2.py ../output/contracts/si_fa2 --html --purge
+~/smartpy-cli/SmartPy.sh compile contracts/si_list.py ../output/contracts/si_list --html --purge
 ```
 
 ## Execute the tests
@@ -86,4 +90,6 @@ cd teia-smart-contracts/python
 ~/smartpy-cli/SmartPy.sh test tests/daoMultisig_test.py ../output/tests/daoMultisig --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/teiaPolls_test.py ../output/tests/teiaPolls --html --purge
 ~/smartpy-cli/SmartPy.sh test tests/deadMansSwitch_test.py ../output/tests/deadMansSwitch --html --purge
+~/smartpy-cli/SmartPy.sh test tests/si_fa2_test.py ../output/tests/si_fa2 --html --purge
+~/smartpy-cli/SmartPy.sh test tests/si_list_test.py ../output/tests/si_list --html --purge
 ```

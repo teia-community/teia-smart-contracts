@@ -86,6 +86,8 @@ compile_all:
 	$(call COMPILE, openLetter)
 	$(call COMPILE, tezosPolls)
 	$(call COMPILE, deadMansSwitch)
+	$(call COMPILE, si_fa2)
+	$(call COMPILE, si_list)
 
 test_all:
 	$(call TEST, teiaMarketplace_v1)
@@ -102,3 +104,6 @@ test_all:
 	$(call TEST, daoMultisig)
 	$(call TEST, teiaPolls)
 	$(call TEST, deadMansSwitch)
+	$(call TEST, si_fa2)
+	$(call TEST, si_list)
+	

@@ -14,4 +14,6 @@ cd python
 ~/smartpy-cli/SmartPy.sh test tests/daoMultisig_test.py /tmp/tests/daoMultisig
 ~/smartpy-cli/SmartPy.sh test tests/teiaPolls_test.py /tmp/tests/teiaPolls
 ~/smartpy-cli/SmartPy.sh test tests/deadMansSwitch_test.py /tmp/tests/deadMansSwitch
+~/smartpy-cli/SmartPy.sh test tests/si_fa2_test.py /tmp/tests/si_fa2 --html --purge
+~/smartpy-cli/SmartPy.sh test tests/si_list_test.py /tmp/tests/si_list --html --purge
 cd - > /dev/null
