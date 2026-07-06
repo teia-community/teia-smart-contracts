@@ -1,0 +1,58 @@
+{
+    "name": "Teia Moderator Contract",
+    "description": "This contract manages a set of moderator addresses for the Teia platform. Multisig wallet users can propose to add or remove moderators, update the linked multisig address or update contract metadata. Proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/moderator.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "MOD_NOT_MULTISIG_USER" },
+            "expansion": { "string": "The operation can only be executed by one of the linked multisig wallet users" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_user view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_GET_MIN_VOTES_FAILED" },
+            "expansion": { "string": "Failed to call the get_minimum_votes view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_GET_EXPIRATION_FAILED" },
+            "expansion": { "string": "Failed to call the get_expiration_time view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_NO_PROPOSAL" },
+            "expansion": { "string": "The given proposal id doesn't exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_ALREADY_EXECUTED" },
+            "expansion": { "string": "The proposal has been executed and cannot be voted or executed anymore" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_NOT_ENOUGH_VOTES" },
+            "expansion": { "string": "The proposal didn't receive enough positive votes to be executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MOD_PROPOSAL_EXPIRED" },
+            "expansion": { "string": "The proposal has expired and cannot be executed anymore" },
+            "languages": ["en"]
+        }
+    ]
+}

@@ -1,0 +1,153 @@
+{
+    "name": "Teia Token Comments",
+    "description": "On-chain comments on Teia FA2 tokens, gated by ownership of the specific token being commented on. Each post specifies a target (fa2_address, token_id); the caller must hold that token at post time. Any token holder can post and reply to comments on tokens they hold; senders can edit and hide their own comments. Each of the three sender-facing actions (post, edit, hide) charges its own configurable fee, sent to the fee recipient (typically the Teia multisig); any fee can be set to 0 via governance. Every edit archives the prior version into an on-chain history big_map so the full edit history of any comment is preserved forever and queryable via the get_comment_version view. Any single multisig user can hide or unhide any comment for fast moderation (no fee, no vote); banning a wallet from posting requires a passed multisig proposal. Includes reply threading via parent_id (replies must target the same (fa2_address, token_id) as the parent), a contract-wide ban list, and multisig governance for pause, fees (per action), fee recipient, and contract metadata updates.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/messages/token_comments.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "CONTRACT_PAUSED" },
+            "expansion": { "string": "The contract is currently paused" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TEZ_TRANSFER" },
+            "expansion": { "string": "The operation does not accept tez transfers" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "INCORRECT_FEE" },
+            "expansion": { "string": "The provided tez amount does not match the required fee for this action (post_fee for post_comment, edit_fee for edit_comment, hide_fee for set_own_comment_hidden)" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "EMPTY_CONTENT" },
+            "expansion": { "string": "The comment content cannot be empty" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CONTENT_TOO_LARGE" },
+            "expansion": { "string": "The comment content exceeds the maximum size of 32768 bytes" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PARENT_NOT_FOUND" },
+            "expansion": { "string": "The parent comment does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PARENT_WRONG_TOKEN" },
+            "expansion": { "string": "The parent comment belongs to a different token (fa2_address or token_id mismatch); a reply must target the same (fa2_address, token_id) as its parent" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PARENT_HIDDEN" },
+            "expansion": { "string": "The parent comment has been hidden and cannot receive new replies" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "COMMENT_NOT_FOUND" },
+            "expansion": { "string": "The given comment ID does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NOT_AUTHORIZED" },
+            "expansion": { "string": "The caller is not authorized to perform this action" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "USER_BANNED" },
+            "expansion": { "string": "The caller is on the ban list and cannot post or edit comments" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "VERSION_NOT_FOUND" },
+            "expansion": { "string": "The requested historical version of the comment does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PENDING_POST_EXISTS" },
+            "expansion": { "string": "Another comment is already being processed; please retry once the prior post resolves" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NO_PENDING_POST" },
+            "expansion": { "string": "The balance callback was invoked but no pending comment is in flight" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "INVALID_CALLBACK_SENDER" },
+            "expansion": { "string": "The balance callback can only be invoked by the FA2 contract targeted by the pending post_comment call" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "EMPTY_BALANCE_RESPONSE" },
+            "expansion": { "string": "The FA2 contract returned an empty balance response" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NOT_TOKEN_HOLDER" },
+            "expansion": { "string": "The caller does not hold the targeted token and cannot post a comment on it" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "SELF_CALLBACK_ERROR" },
+            "expansion": { "string": "Could not resolve the balance_callback entrypoint on the contract itself" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "INVALID_FA2" },
+            "expansion": { "string": "The targeted FA2 contract does not expose a compatible balance_of entrypoint" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_user view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_NOT_MULTISIG_USER" },
+            "expansion": { "string": "The operation can only be executed by one of the linked multisig wallet users" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_GET_MIN_VOTES_FAILED" },
+            "expansion": { "string": "Failed to call the get_minimum_votes view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_GET_EXPIRATION_FAILED" },
+            "expansion": { "string": "Failed to call the get_expiration_time view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_PROPOSAL_EXPIRED" },
+            "expansion": { "string": "The proposal has expired and can no longer be executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_NO_PROPOSAL" },
+            "expansion": { "string": "The given proposal ID does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_ALREADY_EXECUTED" },
+            "expansion": { "string": "The proposal has already been executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TC_NOT_ENOUGH_VOTES" },
+            "expansion": { "string": "The proposal did not receive enough positive votes to be executed" },
+            "languages": ["en"]
+        }
+    ]
+}
