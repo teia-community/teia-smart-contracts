@@ -1,0 +1,188 @@
+{
+    "name": "Teia Channels",
+    "description": "On-chain community channel contract with three-tier access control (creator > admin > merkle user), hide/delete separation, edit history, per-channel and contract-wide ban lists, and multisig super moderation. Channel creators choose between three access modes: unrestricted (anyone can post), allowlist (Merkle-proof-gated posting), or closed (creator and admins only — used for artist blogs and DMs). Messages carry a hidden flag and version counter; each edit archives the prior version into an on-chain history big_map. Delete is sender-only regardless of access mode, preventing retroactive delete-power changes on mode transitions. Three moderation tiers: senders hide their own messages, channel creators/admins moderate their channel, and any multisig user can hide any message in any channel as super moderator. Per-action fees (post, edit, hide) plus a channel creation fee, all governable via the Teia multisig. Includes per-channel admin sets (capped at 15), per-channel ban list, contract-wide ban list, and reply threading with parent-hidden checks.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/messages/channels.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "CONTRACT_PAUSED" },
+            "expansion": { "string": "The contract is currently paused" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TEZ_TRANSFER" },
+            "expansion": { "string": "The operation does not accept tez transfers" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "INCORRECT_FEE" },
+            "expansion": { "string": "The provided tez amount does not match the required fee for this action (post_fee for post_message, edit_fee for edit_message, hide_fee for set_own_message_hidden, channel_fee for create_channel)" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNEL_NOT_FOUND" },
+            "expansion": { "string": "The given channel ID does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNEL_HIDDEN" },
+            "expansion": { "string": "The channel has been hidden and does not accept new messages or configuration changes" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "EMPTY_METADATA" },
+            "expansion": { "string": "The metadata URI cannot be empty" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "EMPTY_CONTENT" },
+            "expansion": { "string": "The message content cannot be empty" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CONTENT_TOO_LARGE" },
+            "expansion": { "string": "The message content exceeds the maximum size of 32768 bytes" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PARENT_NOT_FOUND" },
+            "expansion": { "string": "The parent message does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PARENT_WRONG_CHANNEL" },
+            "expansion": { "string": "The parent message belongs to a different channel" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PARENT_HIDDEN" },
+            "expansion": { "string": "The parent message has been hidden and cannot receive new replies" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "MESSAGE_NOT_FOUND" },
+            "expansion": { "string": "The given message ID does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "UNDERFLOW" },
+            "expansion": { "string": "Deleting this message would cause the channel message count to underflow" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NOT_AUTHORIZED" },
+            "expansion": { "string": "The caller is not authorized to perform this action" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NOT_CHANNEL_CREATOR" },
+            "expansion": { "string": "Only the channel creator can perform this operation (closed channels restrict configure_channel to creator only)" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NOT_CHANNEL_ADMIN" },
+            "expansion": { "string": "Only the channel creator or a channel admin can perform this operation" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "TOO_MANY_ADMINS" },
+            "expansion": { "string": "A channel cannot have more than 15 admins" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "USER_BANNED" },
+            "expansion": { "string": "The caller is on the contract-wide ban list and cannot post or edit messages" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "USER_BANNED_IN_CHANNEL" },
+            "expansion": { "string": "The caller is banned from this specific channel and cannot post new messages (channel creators are exempt from per-channel bans)" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CANNOT_BAN_CREATOR" },
+            "expansion": { "string": "The channel creator cannot be banned from their own channel" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "VERSION_NOT_FOUND" },
+            "expansion": { "string": "The requested historical version of the message does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "ALLOWLIST_NEEDS_ROOT" },
+            "expansion": { "string": "Allowlist access mode requires a Merkle root" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "ROOT_NOT_ALLOWED" },
+            "expansion": { "string": "Only allowlist access mode may set a Merkle root" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "NO_MERKLE_ROOT" },
+            "expansion": { "string": "The channel is in allowlist mode but has no Merkle root set" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "PROOF_REQUIRED" },
+            "expansion": { "string": "A Merkle proof is required to post to an allowlist-restricted channel" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "INVALID_MERKLE_PROOF" },
+            "expansion": { "string": "The provided Merkle proof does not verify against the channel's Merkle root" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_user view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_NOT_MULTISIG_USER" },
+            "expansion": { "string": "The operation can only be executed by one of the linked multisig wallet users" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_GET_MIN_VOTES_FAILED" },
+            "expansion": { "string": "Failed to call the get_minimum_votes view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_GET_EXPIRATION_FAILED" },
+            "expansion": { "string": "Failed to call the get_expiration_time view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_PROPOSAL_EXPIRED" },
+            "expansion": { "string": "The proposal has expired and can no longer be executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_NO_PROPOSAL" },
+            "expansion": { "string": "The given proposal ID does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_ALREADY_EXECUTED" },
+            "expansion": { "string": "The proposal has already been executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CHANNELS_NOT_ENOUGH_VOTES" },
+            "expansion": { "string": "The proposal did not receive enough positive votes to be executed" },
+            "languages": ["en"]
+        }
+    ]
+}
