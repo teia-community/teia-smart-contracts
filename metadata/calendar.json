@@ -1,0 +1,113 @@
+{
+    "name": "Teia Calendar Contract",
+    "description": "On-chain registry for the Teia community calendar. Each event is identified by an auto-incrementing integer event_id and stores its current IPFS/Arweave CID and a hidden flag. Version history is not kept on-chain: every event mutation emits a version event (tag event_created or event_updated) carrying the CID, editor, optional proposer, version number and timestamp, from which an indexer reconstructs the full history without paying for an unbounded on-chain big_map. All event details (title, start/end date, location, description, links, images) live off-chain in the event's CID content. Moderators and linked multisig users can create, update and hide events directly. Teia token holders can submit proposals to edit an existing event (propose_edit) or to create a brand new event (propose_event); each proposal action charges its own configurable fee, forwarded to the fee recipient (typically the Teia multisig), and any fee can be set to 0 via governance. A moderator or multisig user approves or rejects pending proposals; a single approval applies the change (appending a new version to the event, or creating the event and assigning it the next integer id). Multisig governance covers pause, the linked multisig/moderator/token addresses, the token id, per-action fees, the fee recipient and contract metadata updates; governance proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/calendar/teiaCalendar.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "CAL_NOT_AUTHORIZED" },
+            "expansion": { "string": "The caller is not authorized to perform this action" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_PAUSED" },
+            "expansion": { "string": "The contract is currently paused" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_TEZ_TRANSFER" },
+            "expansion": { "string": "The operation does not accept tez transfers" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_INCORRECT_FEE" },
+            "expansion": { "string": "The provided tez amount does not match the required fee for this action (propose_edit_fee for propose_edit, propose_event_fee for propose_event)" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_EMPTY_CID" },
+            "expansion": { "string": "The CID cannot be empty" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_EVENT_NOT_FOUND" },
+            "expansion": { "string": "No event exists for the given event id" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_NO_TOKENS" },
+            "expansion": { "string": "The caller does not hold any Teia tokens and cannot submit a proposal" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_NO_PROPOSAL" },
+            "expansion": { "string": "The given community proposal id does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_ALREADY_RESOLVED" },
+            "expansion": { "string": "The community proposal has already been approved or rejected" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_MOD_LOCKED" },
+            "expansion": { "string": "The event is mod-locked (a moderator has hidden it); only a moderator or multisig user can change its hidden flag" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_NO_GOV_PROPOSAL" },
+            "expansion": { "string": "The given governance proposal id does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_GOV_ALREADY_EXECUTED" },
+            "expansion": { "string": "The governance proposal has already been executed and cannot be voted on or executed again" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_GOV_NOT_ENOUGH_VOTES" },
+            "expansion": { "string": "The governance proposal did not receive enough positive votes to be executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_GOV_EXPIRED" },
+            "expansion": { "string": "The governance proposal has expired and can no longer be voted on or executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_MULTISIG_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_user view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_MODERATOR_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_moderator view on the linked moderator contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_TOKEN_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the get_balance view on the linked Teia token contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_GET_MIN_VOTES_FAILED" },
+            "expansion": { "string": "Failed to call the get_minimum_votes view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "CAL_GET_EXPIRATION_FAILED" },
+            "expansion": { "string": "Failed to call the get_expiration_time view on the linked multisig contract" },
+            "languages": ["en"]
+        }
+    ]
+}

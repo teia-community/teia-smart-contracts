@@ -1,0 +1,113 @@
+{
+    "name": "Teia Wiki Contract",
+    "description": "On-chain registry for the Teia community wiki. Each page is identified by an auto-incrementing integer page_id and stores its current IPFS/Arweave CID, a hidden flag and a full, append-only version history (every version keeps its CID, editor, optional proposer and timestamp, queryable via the get_version view). Page names/titles live off-chain in the page's CID content; duplicate-name checks are handled by the UI. Moderators and linked multisig users can create, update and hide pages directly. Teia token holders can submit proposals to edit an existing page (create_proposal) or to create a brand new page (prop_new_page); each proposal action charges its own configurable fee, forwarded to the fee recipient (typically the Teia multisig), and any fee can be set to 0 via governance. A moderator or multisig user approves or rejects pending proposals; a single approval applies the change (creating the page or appending a new version). Multisig governance covers pause, the linked multisig/moderator/token addresses, the token id, per-action fees, the fee recipient and contract metadata updates; governance proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
+    "version": "2.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": ["Teia Community <https://twitter.com/TeiaCommunity>"],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": ["SmartPy"],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/wiki/wiki.py"
+    },
+    "interfaces": ["TZIP-016"],
+    "errors": [
+        {
+            "error": { "string": "WIKI_NOT_AUTHORIZED" },
+            "expansion": { "string": "The caller is not authorized to perform this action" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_PAUSED" },
+            "expansion": { "string": "The contract is currently paused" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_TEZ_TRANSFER" },
+            "expansion": { "string": "The operation does not accept tez transfers" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_INCORRECT_FEE" },
+            "expansion": { "string": "The provided tez amount does not match the required fee for this action (propose_edit_fee for create_proposal, propose_page_fee for prop_new_page)" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_EMPTY_CID" },
+            "expansion": { "string": "The CID cannot be empty" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_PAGE_NOT_FOUND" },
+            "expansion": { "string": "No page exists for the given page id" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_VERSION_NOT_FOUND" },
+            "expansion": { "string": "No version exists for the given (page id, version) key" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_NO_TOKENS" },
+            "expansion": { "string": "The caller does not hold any Teia tokens and cannot submit a proposal" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_NO_PROPOSAL" },
+            "expansion": { "string": "The given community proposal id does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_ALREADY_RESOLVED" },
+            "expansion": { "string": "The community proposal has already been approved or rejected" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_NO_GOV_PROPOSAL" },
+            "expansion": { "string": "The given governance proposal id does not exist" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_GOV_ALREADY_EXECUTED" },
+            "expansion": { "string": "The governance proposal has already been executed and cannot be voted on or executed again" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_GOV_NOT_ENOUGH_VOTES" },
+            "expansion": { "string": "The governance proposal did not receive enough positive votes to be executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_GOV_EXPIRED" },
+            "expansion": { "string": "The governance proposal has expired and can no longer be voted on or executed" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_MULTISIG_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_user view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_MODERATOR_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the is_moderator view on the linked moderator contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_TOKEN_VIEW_FAILED" },
+            "expansion": { "string": "Failed to call the get_balance view on the linked Teia token contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_GET_MIN_VOTES_FAILED" },
+            "expansion": { "string": "Failed to call the get_minimum_votes view on the linked multisig contract" },
+            "languages": ["en"]
+        },
+        {
+            "error": { "string": "WIKI_GET_EXPIRATION_FAILED" },
+            "expansion": { "string": "Failed to call the get_expiration_time view on the linked multisig contract" },
+            "languages": ["en"]
+        }
+    ]
+}
