@@ -1,0 +1,222 @@
+{
+    "name": "Teia Profiles Contract",
+    "description": "On-chain registry of Teia user profiles, keyed by the user's address: every address has at most one profile and writes it itself with set_profile. Each profile stores its current IPFS/Arweave CID, an optional unique handle, a moderated flag and a version counter (version_count). The version history itself is NOT stored on-chain: every CID change emits a complete version record (tag profile_created for a new profile, profile_updated for a new version, each carrying the address, CID, version number and timestamp), from which indexers reconstruct the full append-only history. The profile's display name, description, avatar, links and artist card configuration live off-chain in the profile's CID content. A profile can claim one unique handle (claim_handle) that resolves to its address through the handles big_map and the get_handle_owner view; a handle is 1 to 32 characters from a-z, 0-9, underscore and hyphen, so handles cannot differ only by case and can never be mistaken for a Tezos address. Claiming a new handle releases the previous one, and release_handle gives a handle up. set_profile charges profile_fee and claim_handle charges handle_fee; both default to 0 and are forwarded to the fee recipient. Moderators and linked multisig users have two moderation powers: flagging a profile as moderated (set_profile_moderated), which the owner cannot lift, and blocking a handle (set_handle_blocked), which releases it from its current owner and prevents anyone from claiming it; handles reserved for front end routes are blocked at origination. Multisig governance covers pause, the linked multisig/moderator addresses, the per-action fees, the fee recipient and contract metadata updates; governance proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": [
+        "Teia Community <https://twitter.com/TeiaCommunity>"
+    ],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": [
+            "SmartPy"
+        ],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/profiles/teiaProfiles.py"
+    },
+    "interfaces": [
+        "TZIP-016"
+    ],
+    "errors": [
+        {
+            "error": {
+                "string": "PRF_NOT_AUTHORIZED"
+            },
+            "expansion": {
+                "string": "The caller is not authorized to perform this action"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_PROFILE_NOT_FOUND"
+            },
+            "expansion": {
+                "string": "No profile exists for the given address"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_EMPTY_CID"
+            },
+            "expansion": {
+                "string": "The CID cannot be empty"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_PAUSED"
+            },
+            "expansion": {
+                "string": "The contract is currently paused"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_TEZ_TRANSFER"
+            },
+            "expansion": {
+                "string": "The operation does not accept tez transfers"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_INCORRECT_FEE"
+            },
+            "expansion": {
+                "string": "The provided tez amount does not match the required profile_fee for set_profile or handle_fee for claim_handle"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_INVALID_HANDLE"
+            },
+            "expansion": {
+                "string": "A handle must be 1 to 32 characters from a-z, 0-9, underscore and hyphen"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_HANDLE_TAKEN"
+            },
+            "expansion": {
+                "string": "The handle is already claimed"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_HANDLE_BLOCKED"
+            },
+            "expansion": {
+                "string": "The handle is blocked and cannot be claimed"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_NO_HANDLE"
+            },
+            "expansion": {
+                "string": "The caller's profile has no handle to release"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_NO_GOV_PROPOSAL"
+            },
+            "expansion": {
+                "string": "The given governance proposal id does not exist"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GOV_ALREADY_EXECUTED"
+            },
+            "expansion": {
+                "string": "The governance proposal has already been executed and cannot be voted on or executed again"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GOV_NOT_ENOUGH_VOTES"
+            },
+            "expansion": {
+                "string": "The governance proposal did not receive enough positive votes to be executed"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GOV_EXPIRED"
+            },
+            "expansion": {
+                "string": "The governance proposal has expired and can no longer be voted on or executed"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_MULTISIG_VIEW_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the is_user view on the linked multisig contract"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_MODERATOR_VIEW_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the is_moderator view on the linked moderator contract"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GET_MIN_VOTES_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the get_minimum_votes view on the linked multisig contract"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GET_EXPIRATION_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the get_expiration_time view on the linked multisig contract"
+            },
+            "languages": [
+                "en"
+            ]
+        }
+    ]
+}
