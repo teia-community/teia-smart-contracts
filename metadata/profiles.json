@@ -1,6 +1,6 @@
 {
     "name": "Teia Profiles Contract",
-    "description": "On-chain registry of Teia user profiles, keyed by the user's address: every address has at most one profile and writes it itself with set_profile. Each profile stores its current IPFS/Arweave CID, an optional unique handle, a moderated flag and a version counter (version_count). The version history itself is NOT stored on-chain: every CID change emits a complete version record (tag profile_created for a new profile, profile_updated for a new version, each carrying the address, CID, version number and timestamp), from which indexers reconstruct the full append-only history. The profile's display name, description, avatar, links and artist card configuration live off-chain in the profile's CID content. A profile can claim one unique handle (claim_handle) that resolves to its address through the handles big_map and the get_handle_owner view; a handle is 1 to 32 characters from a-z, 0-9, underscore and hyphen, so handles cannot differ only by case and can never be mistaken for a Tezos address. Claiming a new handle releases the previous one, and release_handle gives a handle up. set_profile charges profile_fee and claim_handle charges handle_fee; both default to 0 and are forwarded to the fee recipient. Moderators and linked multisig users have two moderation powers: flagging a profile as moderated (set_profile_moderated), which the owner cannot lift, and blocking a handle (set_handle_blocked), which releases it from its current owner and prevents anyone from claiming it; handles reserved for front end routes are blocked at origination. Multisig governance covers pause, the linked multisig/moderator addresses, the per-action fees, the fee recipient and contract metadata updates; governance proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
+    "description": "On-chain registry of Teia profile cards, keyed by the owner's address: every wallet has at most one profile card and creates or updates it itself with set_profile. Each card stores its current IPFS/Arweave CID, a hidden flag and a version counter (version_count). The version history itself is NOT stored on-chain: every CID change emits a complete version record (tag profile_created for a new card, profile_updated for a new version, each carrying the address, CID, version number and timestamp), from which indexers reconstruct the full append-only history. The card's name, bio, avatar and display settings live off-chain in the card's CID content. set_profile charges profile_fee, which defaults to 0 and is forwarded to the fee recipient. Moderators and linked multisig users can hide (ban) any profile card and unhide it later (set_profile_hidden); the owner can still update a hidden card but cannot unhide it. Multisig governance covers pause, the linked multisig/moderator addresses, the profile fee, the fee recipient and contract metadata updates; governance proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
     "version": "1.0.0",
     "license": {
         "name": "MIT",
@@ -36,7 +36,7 @@
                 "string": "PRF_PROFILE_NOT_FOUND"
             },
             "expansion": {
-                "string": "No profile exists for the given address"
+                "string": "No profile card exists for the given address"
             },
             "languages": [
                 "en"
@@ -80,51 +80,7 @@
                 "string": "PRF_INCORRECT_FEE"
             },
             "expansion": {
-                "string": "The provided tez amount does not match the required profile_fee for set_profile or handle_fee for claim_handle"
-            },
-            "languages": [
-                "en"
-            ]
-        },
-        {
-            "error": {
-                "string": "PRF_INVALID_HANDLE"
-            },
-            "expansion": {
-                "string": "A handle must be 1 to 32 characters from a-z, 0-9, underscore and hyphen"
-            },
-            "languages": [
-                "en"
-            ]
-        },
-        {
-            "error": {
-                "string": "PRF_HANDLE_TAKEN"
-            },
-            "expansion": {
-                "string": "The handle is already claimed"
-            },
-            "languages": [
-                "en"
-            ]
-        },
-        {
-            "error": {
-                "string": "PRF_HANDLE_BLOCKED"
-            },
-            "expansion": {
-                "string": "The handle is blocked and cannot be claimed"
-            },
-            "languages": [
-                "en"
-            ]
-        },
-        {
-            "error": {
-                "string": "PRF_NO_HANDLE"
-            },
-            "expansion": {
-                "string": "The caller's profile has no handle to release"
+                "string": "The provided tez amount does not match the required profile_fee for set_profile"
             },
             "languages": [
                 "en"
