@@ -1,0 +1,178 @@
+{
+    "name": "Teia Profiles Contract",
+    "description": "On-chain registry of Teia profile cards, keyed by the owner's address: every wallet has at most one profile card and creates or updates it itself with set_profile. Each card stores its current IPFS/Arweave CID, a hidden flag and a version counter (version_count). The version history itself is NOT stored on-chain: every CID change emits a complete version record (tag profile_created for a new card, profile_updated for a new version, each carrying the address, CID, version number and timestamp), from which indexers reconstruct the full append-only history. The card's name, bio, avatar and display settings live off-chain in the card's CID content. set_profile charges profile_fee, which defaults to 0 and is forwarded to the fee recipient. Moderators and linked multisig users can hide (ban) any profile card and unhide it later (set_profile_hidden); the owner can still update a hidden card but cannot unhide it. Multisig governance covers pause, the linked multisig/moderator addresses, the profile fee, the fee recipient and contract metadata updates; governance proposals require a minimum number of votes and expire after a configurable time, both fetched from the linked multisig contract.",
+    "version": "1.0.0",
+    "license": {
+        "name": "MIT",
+        "details": "The MIT License"
+    },
+    "authors": [
+        "Teia Community <https://twitter.com/TeiaCommunity>"
+    ],
+    "homepage": "https://teia.art",
+    "source": {
+        "tools": [
+            "SmartPy"
+        ],
+        "location": "https://github.com/teia-community/teia-smart-contracts/blob/main/python/contracts/profiles/teiaProfiles.py"
+    },
+    "interfaces": [
+        "TZIP-016"
+    ],
+    "errors": [
+        {
+            "error": {
+                "string": "PRF_NOT_AUTHORIZED"
+            },
+            "expansion": {
+                "string": "The caller is not authorized to perform this action"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_PROFILE_NOT_FOUND"
+            },
+            "expansion": {
+                "string": "No profile card exists for the given address"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_EMPTY_CID"
+            },
+            "expansion": {
+                "string": "The CID cannot be empty"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_PAUSED"
+            },
+            "expansion": {
+                "string": "The contract is currently paused"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_TEZ_TRANSFER"
+            },
+            "expansion": {
+                "string": "The operation does not accept tez transfers"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_INCORRECT_FEE"
+            },
+            "expansion": {
+                "string": "The provided tez amount does not match the required profile_fee for set_profile"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_NO_GOV_PROPOSAL"
+            },
+            "expansion": {
+                "string": "The given governance proposal id does not exist"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GOV_ALREADY_EXECUTED"
+            },
+            "expansion": {
+                "string": "The governance proposal has already been executed and cannot be voted on or executed again"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GOV_NOT_ENOUGH_VOTES"
+            },
+            "expansion": {
+                "string": "The governance proposal did not receive enough positive votes to be executed"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GOV_EXPIRED"
+            },
+            "expansion": {
+                "string": "The governance proposal has expired and can no longer be voted on or executed"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_MULTISIG_VIEW_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the is_user view on the linked multisig contract"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_MODERATOR_VIEW_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the is_moderator view on the linked moderator contract"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GET_MIN_VOTES_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the get_minimum_votes view on the linked multisig contract"
+            },
+            "languages": [
+                "en"
+            ]
+        },
+        {
+            "error": {
+                "string": "PRF_GET_EXPIRATION_FAILED"
+            },
+            "expansion": {
+                "string": "Failed to call the get_expiration_time view on the linked multisig contract"
+            },
+            "languages": [
+                "en"
+            ]
+        }
+    ]
+}
